@@ -118,7 +118,7 @@ type alias Model =
 
 init : ( Model, Cmd Msg )
 init =
-    ( "", Cmd.none )
+    ( "This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius. This is the dawning of the Age of Aquarius. ", Cmd.none )
 
 
 type Msg
@@ -160,7 +160,7 @@ view siteMetadata page =
         }
 
 
-editor model =
+scriptEditor model =
     Element.el [ Element.width Element.fill ] <|
         Element.Input.multiline []
             { onChange = Change
@@ -169,6 +169,10 @@ editor model =
             , label = Element.Input.labelAbove [] <| Element.text ""
             , spellcheck = False
             }
+
+
+parsedScript model =
+    Element.paragraph [] [ Element.text model ]
 
 
 pageView :
@@ -183,8 +187,10 @@ pageView model siteMetadata page viewForPage =
             { title = "Cue Extractor"
             , body =
                 [ Element.column [ Element.width Element.fill ]
-                    [ Element.row [ Element.width Element.fill ]
-                        [ editor model, editor model ]
+                    [ Element.row []
+                        [ Element.el [ Element.width Element.fill ] <| scriptEditor model
+                        , Element.el [ Element.width Element.fill ] <| parsedScript model
+                        ]
                     ]
                 ]
             }
