@@ -5,6 +5,7 @@ import Data.Author as Author
 import Date
 import Element exposing (Element)
 import Element.Font as Font
+import Element.Input
 import Feed
 import Head
 import Head.Seo as Seo
@@ -112,23 +113,23 @@ markdownDocument =
 
 
 type alias Model =
-    {}
+    String
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( Model, Cmd.none )
+    ( "", Cmd.none )
 
 
-type alias Msg =
-    ()
+type Msg
+    = Change String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        () ->
-            ( model, Cmd.none )
+        Change s ->
+            ( s, Cmd.none )
 
 
 
@@ -159,6 +160,17 @@ view siteMetadata page =
         }
 
 
+editor model =
+    Element.el [ Element.width Element.fill ] <|
+        Element.Input.multiline []
+            { onChange = Change
+            , text = model
+            , placeholder = Nothing
+            , label = Element.Input.labelAbove [] <| Element.text ""
+            , spellcheck = False
+            }
+
+
 pageView :
     Model
     -> List ( PagePath Pages.PathKey, Metadata )
@@ -170,7 +182,10 @@ pageView model siteMetadata page viewForPage =
         Metadata.App ->
             { title = "Cue Extractor"
             , body =
-                [ Element.text "Cue Extractor"
+                [ Element.column [ Element.width Element.fill ]
+                    [ Element.row [ Element.width Element.fill ]
+                        [ editor model, editor model ]
+                    ]
                 ]
             }
 
