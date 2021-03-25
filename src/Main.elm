@@ -12,6 +12,7 @@ import Head.Seo as Seo
 import Html exposing (Html)
 import Index
 import Json.Decode
+import Json.Encode
 import Layout
 import Markdown.Parser
 import Markdown.Renderer
@@ -25,6 +26,113 @@ import Pages.PagePath exposing (PagePath)
 import Pages.Platform
 import Pages.StaticHttp as StaticHttp
 import Palette
+
+
+
+--     _
+--    / \   _ __  _ __
+--   / _ \ | '_ \| '_ \
+--  / ___ \| |_) | |_) |
+-- /_/   \_\ .__/| .__/
+--         |_|   |_|
+
+
+type alias Model =
+    String
+
+
+init : ( Model, Cmd Msg )
+init =
+    ( "This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius. This is the dawning of the Age of Aquarius. ", Cmd.none )
+
+
+type Msg
+    = Change String
+
+
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
+    case msg of
+        Change s ->
+            ( s, Cmd.none )
+
+
+subscriptions _ _ _ =
+    Sub.none
+
+
+app model =
+    { title = "Cue Extractor"
+    , body =
+        [ Element.column [ Element.width Element.fill ]
+            [ Element.row []
+                [ Element.el [ Element.width Element.fill ] <| scriptEditor model
+                , Element.el [ Element.width Element.fill, Element.alignTop ] <| parsedScript model
+                ]
+            ]
+        ]
+    }
+
+
+scriptEditor model =
+    Element.el [ Element.width Element.fill ] <|
+        Element.Input.multiline []
+            { onChange = Change
+            , text = model
+            , placeholder = Nothing
+            , label = Element.Input.labelAbove [] <| Element.text ""
+            , spellcheck = False
+            }
+
+
+parsedScript model =
+    model
+        |> String.split "\n"
+        |> List.map Element.text
+        |> List.map List.singleton
+        |> List.map (Element.paragraph [])
+        |> Element.textColumn [ Element.spacing 5, Element.padding 40 ]
+
+
+type alias Line =
+    { speaker : String, identifier : String, line : String }
+
+
+type alias Script =
+    { title : String
+    , lines : List Line
+    }
+
+
+scriptEncoder : Script -> Json.Encode.Value
+scriptEncoder { title, lines } =
+    Json.Encode.object
+        [ ( "lines", Json.Encode.list (lineEncoder title) lines ) ]
+
+
+lineEncoder : String -> Line -> Json.Encode.Value
+lineEncoder title { speaker, identifier, line } =
+    Json.Encode.object
+        [ ( "t", Json.Encode.string line )
+        , ( "s", Json.Encode.string speaker )
+        , ( "l", Json.Encode.string identifier )
+        , ( "p", Json.Encode.string title )
+        ]
+
+
+
+--  _____ _
+-- | ____| |_ __ ___    _ __   __ _  __ _  ___  ___
+-- |  _| | | '_ ` _ \  | '_ \ / _` |/ _` |/ _ \/ __|
+-- | |___| | | | | | | | |_) | (_| | (_| |  __/\__ \
+-- |_____|_|_| |_| |_| | .__/ \__,_|\__, |\___||___/
+--                     |_|          |___/
+--   __                 _                   _   _
+--  / _|_ __ ___  _ __ | |_ _ __ ___   __ _| |_| |_ ___ _ __
+-- | |_| '__/ _ \| '_ \| __| '_ ` _ \ / _` | __| __/ _ \ '__|
+-- |  _| | | (_) | | | | |_| | | | | | (_| | |_| ||  __/ |
+-- |_| |_|  \___/|_| |_|\__|_| |_| |_|\__,_|\__|\__\___|_|
+--
 
 
 manifest : Manifest.Config Pages.PathKey
@@ -112,34 +220,6 @@ markdownDocument =
     }
 
 
-type alias Model =
-    String
-
-
-init : ( Model, Cmd Msg )
-init =
-    ( "This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius. This is the dawning of the Age of Aquarius. ", Cmd.none )
-
-
-type Msg
-    = Change String
-
-
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    case msg of
-        Change s ->
-            ( s, Cmd.none )
-
-
-
---subscriptions : Model -> Sub Msg
-
-
-subscriptions _ _ _ =
-    Sub.none
-
-
 view :
     List ( PagePath Pages.PathKey, Metadata )
     ->
@@ -160,26 +240,6 @@ view siteMetadata page =
         }
 
 
-scriptEditor model =
-    Element.el [ Element.width Element.fill ] <|
-        Element.Input.multiline []
-            { onChange = Change
-            , text = model
-            , placeholder = Nothing
-            , label = Element.Input.labelAbove [] <| Element.text ""
-            , spellcheck = False
-            }
-
-
-parsedScript model =
-    model
-        |> String.split "\n"
-        |> List.map Element.text
-        |> List.map List.singleton
-        |> List.map (Element.paragraph [])
-        |> Element.textColumn [ Element.spacing 5, Element.padding 40 ]
-
-
 pageView :
     Model
     -> List ( PagePath Pages.PathKey, Metadata )
@@ -189,16 +249,7 @@ pageView :
 pageView model siteMetadata page viewForPage =
     case page.frontmatter of
         Metadata.App ->
-            { title = "Cue Extractor"
-            , body =
-                [ Element.column [ Element.width Element.fill ]
-                    [ Element.row []
-                        [ Element.el [ Element.width Element.fill ] <| scriptEditor model
-                        , Element.el [ Element.width Element.fill, Element.alignTop ] <| parsedScript model
-                        ]
-                    ]
-                ]
-            }
+            app model
 
         Metadata.Page metadata ->
             { title = metadata.title
