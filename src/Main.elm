@@ -1,5 +1,6 @@
 module Main exposing (main)
 
+import Base64
 import Color
 import Data.Author as Author
 import Date
@@ -118,6 +119,18 @@ lineEncoder title { speaker, identifier, line } =
         , ( "l", Json.Encode.string identifier )
         , ( "p", Json.Encode.string title )
         ]
+
+
+cueCannonUrl : Script -> String
+cueCannonUrl script =
+    let
+        baseUrl =
+            "cuecannon.com/direct?script="
+    in
+    scriptEncoder script
+        |> Json.Encode.encode 0
+        |> Base64.encode
+        |> (++) baseUrl
 
 
 

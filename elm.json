@@ -20,7 +20,8 @@
             "elm/url": "1.0.0",
             "elm-community/list-extra": "8.3.0",
             "justinmimbs/date": "3.2.1",
-            "mdgriffith/elm-ui": "1.1.8"
+            "mdgriffith/elm-ui": "1.1.8",
+            "truqu/elm-base64": "2.0.4"
         },
         "indirect": {
             "ThinkAlexandria/elm-html-in-elm": "1.0.1",
