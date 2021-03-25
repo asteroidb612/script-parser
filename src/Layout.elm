@@ -29,10 +29,10 @@ view document page =
             [ Element.width Element.fill ]
             [ header page.path
             , Element.column
-                [ Element.padding 30
-                , Element.spacing 40
+                [ Element.padding 3
+                , Element.spacing 4
                 , Element.Region.mainContent
-                , Element.width (Element.fill |> Element.maximum 800)
+                , Element.width Element.fill
                 , Element.centerX
                 ]
                 document.body

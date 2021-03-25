@@ -172,7 +172,12 @@ scriptEditor model =
 
 
 parsedScript model =
-    Element.paragraph [] [ Element.text model ]
+    model
+        |> String.split "\n"
+        |> List.map Element.text
+        |> List.map List.singleton
+        |> List.map (Element.paragraph [])
+        |> Element.textColumn [ Element.spacing 5, Element.padding 40 ]
 
 
 pageView :
@@ -189,7 +194,7 @@ pageView model siteMetadata page viewForPage =
                 [ Element.column [ Element.width Element.fill ]
                     [ Element.row []
                         [ Element.el [ Element.width Element.fill ] <| scriptEditor model
-                        , Element.el [ Element.width Element.fill ] <| parsedScript model
+                        , Element.el [ Element.width Element.fill, Element.alignTop ] <| parsedScript model
                         ]
                     ]
                 ]
