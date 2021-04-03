@@ -6,6 +6,7 @@ import Element exposing (Element)
 import Element.Input
 import ElmPages exposing (canonicalSiteUrl, generateFiles, manifest, markdownDocument, view)
 import Json.Encode
+import Macbeth exposing (scene1)
 import Material.Icons exposing (offline_bolt)
 import Material.Icons.Types exposing (Coloring(..))
 import Metadata exposing (Metadata)
@@ -54,14 +55,10 @@ type alias Model =
     { plainScript : String, scriptPieces : List ScriptPiece }
 
 
-testString1 =
-    "This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius. This is the dawning of the Age of Aquarius. "
-
-
 init : ( Model, Cmd Msg )
 init =
-    ( { plainScript = testString1
-      , scriptPieces = scriptPiecesFromPlainScript testString1
+    ( { plainScript = scene1
+      , scriptPieces = scriptPiecesFromPlainScript scene1
       }
     , Cmd.none
     )
