@@ -12,7 +12,9 @@ import Material.Icons.Types exposing (Coloring(..))
 import Metadata exposing (Metadata)
 import Pages exposing (images, pages)
 import Pages.Platform
+import Widget
 import Widget.Icon exposing (Icon)
+import Widget.Material as Material exposing (defaultPalette)
 
 
 
@@ -22,6 +24,7 @@ import Widget.Icon exposing (Icon)
 --  / ___ \| |_) | |_) |
 -- /_/   \_\ .__/| .__/
 --         |_|   |_|
+-- App: Users paste a script in, then mark which script parts are character names etc, then export to the app
 -- the intellij-elm plugin doesn't support type aliases for Programs so we need to use this line
 -- main : Platform.Program Pages.Platform.Flags (Pages.Platform.Model Model Msg Metadata Rendered) (Pages.Platform.Msg Msg Metadata Rendered)
 
@@ -49,16 +52,18 @@ type alias Rendered =
 
 type Msg
     = Change String
+    | ShowHideCopyPaste
 
 
 type alias Model =
-    { plainScript : String, scriptPieces : List ScriptPiece }
+    { plainScript : String, scriptPieces : List ScriptPiece, showCopyPaste : Bool }
 
 
 init : ( Model, Cmd Msg )
 init =
     ( { plainScript = scene1
       , scriptPieces = scriptPiecesFromPlainScript scene1
+      , showCopyPaste = True
       }
     , Cmd.none
     )
@@ -68,11 +73,15 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Change s ->
-            ( { plainScript = s
-              , scriptPieces = scriptPiecesFromPlainScript s
+            ( { model
+                | plainScript = s
+                , scriptPieces = scriptPiecesFromPlainScript s
               }
             , Cmd.none
             )
+
+        ShowHideCopyPaste ->
+            ( { model | showCopyPaste = not model.showCopyPaste }, Cmd.none )
 
 
 subscriptions : Metadata -> pages -> Model -> Sub msg
@@ -87,6 +96,11 @@ subscriptions _ _ _ =
 --  ___) | (__| |  | | |_) | |_  | | | | | ||  __/ |  |  _| (_| | (_|  __/
 -- |____/ \___|_|  |_| .__/ \__| |_|_| |_|\__\___|_|  |_|  \__,_|\___\___|
 --                   |_|
+-- Script interface: A user can go through what they've copy-pasted and mark parts
+
+
+palette =
+    { defaultPalette | primary = Color.black }
 
 
 scriptParseApp : Model -> { title : String, body : List (Element Msg) }
@@ -94,9 +108,31 @@ scriptParseApp model =
     { title = "Script Parser"
     , body =
         [ Element.column [ Element.width Element.fill ]
-            [ Element.row []
-                [ Element.el [ Element.width Element.fill ] <| scriptEditor model
-                , Element.el [ Element.width Element.fill, Element.alignTop ] <| scriptPiecesView model
+            [ if model.plainScript /= "" then
+                Element.row [ Element.spacing 10, Element.padding 10 ]
+                    [ Widget.switch
+                        (Material.switch palette)
+                        { description = "Show or hide copy paste"
+                        , onPress = Just ShowHideCopyPaste
+                        , active = model.showCopyPaste
+                        }
+                    , Element.text "Show or hide copy paste"
+                    ]
+
+              else
+                Element.none
+            , Element.row
+                [ Element.width Element.fill ]
+                [ if model.showCopyPaste then
+                    Element.el [ Element.width Element.fill, Element.alignTop ] <| scriptEditor model
+
+                  else
+                    Element.none
+                , if model.plainScript /= "" then
+                    Element.el [ Element.width Element.fill, Element.alignTop ] <| scriptPiecesView model
+
+                  else
+                    Element.none
                 ]
             ]
         ]
@@ -109,7 +145,7 @@ scriptEditor { plainScript } =
         Element.Input.multiline []
             { onChange = Change
             , text = plainScript
-            , placeholder = Nothing
+            , placeholder = Just (Element.Input.placeholder [] (Element.text "Paste a script here to parse into cues!"))
             , label = Element.Input.labelAbove [] <| Element.text ""
             , spellcheck = False
             }
@@ -148,6 +184,7 @@ iconWrapper icon =
 --  ___) | (__| |  | | |_) | |_  |  __/ (_| | |  \__ \ | | | | (_| |
 -- |____/ \___|_|  |_| .__/ \__| |_|   \__,_|_|  |___/_|_| |_|\__, |
 --                   |_|                                      |___/
+-- Script Parsing: Do we have enough info about this script to export it to the app?
 
 
 type ScriptPiece
@@ -238,6 +275,7 @@ parseScript scriptPieces =
 --  ___) | (__| |  | | |_) | |_  | |___ >  <| |_) | (_) | |  | |_
 -- |____/ \___|_|  |_| .__/ \__| |_____/_/\_\ .__/ \___/|_|   \__|
 --                   |_|                    |_|
+-- Script Export: Turn a script into a link the user can click on
 
 
 type alias ScriptLine =
