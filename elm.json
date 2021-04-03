@@ -7,6 +7,7 @@
     "elm-version": "0.19.1",
     "dependencies": {
         "direct": {
+            "Orasund/elm-ui-widgets": "3.0.2",
             "avh4/elm-color": "1.0.0",
             "dillonkearns/elm-markdown": "6.0.1",
             "dillonkearns/elm-pages": "7.0.0",
@@ -19,6 +20,7 @@
             "elm/time": "1.0.0",
             "elm/url": "1.0.0",
             "elm-community/list-extra": "8.3.0",
+            "icidasset/elm-material-icons": "7.0.0",
             "justinmimbs/date": "3.2.1",
             "mdgriffith/elm-ui": "1.1.8",
             "truqu/elm-base64": "2.0.4"
@@ -37,6 +39,7 @@
             "elm/regex": "1.0.0",
             "elm/virtual-dom": "1.0.2",
             "elm-community/dict-extra": "2.4.0",
+            "elm-community/intdict": "3.0.0",
             "elm-community/result-extra": "2.4.0",
             "fredcy/elm-parseint": "2.0.1",
             "justinmimbs/time-extra": "1.1.0",
@@ -48,6 +51,7 @@
             "rtfeldman/elm-hex": "1.0.0",
             "ryannhg/date-format": "2.3.0",
             "tripokey/elm-fuzzy": "5.2.1",
+            "turboMaCk/queue": "1.1.0",
             "zwilias/json-decode-exploration": "6.0.0"
         }
     },

@@ -56,12 +56,12 @@ manifest =
     , categories = [ Pages.Manifest.Category.education ]
     , displayMode = Manifest.Standalone
     , orientation = Manifest.Portrait
-    , description = "elm-pages-starter - A statically typed site generator."
+    , description = "Script Parser - a cue-script extractor"
     , iarcRatingId = Nothing
-    , name = "elm-pages-starter"
+    , name = "Script Parser"
     , themeColor = Just Color.white
     , startUrl = pages.index
-    , shortName = Just "elm-pages-starter"
+    , shortName = Just "Script Parser"
     , sourceIcon = images.iconPng
     , icons = []
     }

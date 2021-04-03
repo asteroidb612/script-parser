@@ -9,7 +9,8 @@
     "postinstall": "elm-tooling install"
   },
   "dependencies": {
-    "elm-pages": "^1.0.8"
+    "elm-pages": "^1.0.8",
+    "undefined": "github:avh4/elm-color"
   },
   "devDependencies": {
     "elm-tooling": "^1.3.0",

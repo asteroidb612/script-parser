@@ -1,13 +1,17 @@
 module Main exposing (main)
 
 import Base64
+import Color
 import Element exposing (Element)
 import Element.Input
 import ElmPages exposing (canonicalSiteUrl, generateFiles, manifest, markdownDocument, view)
 import Json.Encode
+import Material.Icons exposing (offline_bolt)
+import Material.Icons.Types exposing (Coloring(..))
 import Metadata exposing (Metadata)
 import Pages exposing (images, pages)
 import Pages.Platform
+import Widget.Icon exposing (Icon)
 
 
 
@@ -125,10 +129,19 @@ scriptPieceView : ScriptPiece -> Element Msg
 scriptPieceView scriptPiece =
     case scriptPiece of
         UnsurePiece u ->
-            Element.paragraph [] [ Element.text u ]
+            Element.paragraph []
+                [ Element.text "Unsure"
+                , iconWrapper Material.Icons.done
+                , Element.text u
+                ]
 
         _ ->
             Element.none
+
+
+iconWrapper : Material.Icons.Types.Icon Msg -> Element Msg
+iconWrapper icon =
+    Widget.Icon.elmMaterialIcons Color icon { size = 20, color = Color.blue }
 
 
 
