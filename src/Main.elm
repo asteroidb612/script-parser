@@ -94,7 +94,7 @@ subscriptions _ _ _ =
 
 scriptParseApp : Model -> { title : String, body : List (Element Msg) }
 scriptParseApp model =
-    { title = "Cue Extractor"
+    { title = "Script Parser"
     , body =
         [ Element.column [ Element.width Element.fill ]
             [ Element.row []
