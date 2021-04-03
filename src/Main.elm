@@ -42,26 +42,39 @@ type alias Rendered =
     Element Msg
 
 
+type Msg
+    = Change String
+
+
 type alias Model =
-    String
+    { plainScript : String, scriptPieces : List ScriptPiece }
+
+
+testString1 =
+    "This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius. This is the dawning of the Age of Aquarius. "
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( "This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius.This is the dawning of the Age of Aquarius. This is the dawning of the Age of Aquarius. ", Cmd.none )
-
-
-type Msg
-    = Change String
+    ( { plainScript = testString1
+      , scriptPieces = scriptPiecesFromPlainScript testString1
+      }
+    , Cmd.none
+    )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Change s ->
-            ( s, Cmd.none )
+            ( { plainScript = s
+              , scriptPieces = scriptPiecesFromPlainScript s
+              }
+            , Cmd.none
+            )
 
 
+subscriptions : Metadata -> pages -> Model -> Sub msg
 subscriptions _ _ _ =
     Sub.none
 
@@ -82,31 +95,130 @@ scriptParseApp model =
         [ Element.column [ Element.width Element.fill ]
             [ Element.row []
                 [ Element.el [ Element.width Element.fill ] <| scriptEditor model
-                , Element.el [ Element.width Element.fill, Element.alignTop ] <| parsedScript model
+                , Element.el [ Element.width Element.fill, Element.alignTop ] <| scriptPiecesView model
                 ]
             ]
         ]
     }
 
 
-scriptEditor model =
+scriptEditor : Model -> Element Msg
+scriptEditor { plainScript } =
     Element.el [ Element.width Element.fill ] <|
         Element.Input.multiline []
             { onChange = Change
-            , text = model
+            , text = plainScript
             , placeholder = Nothing
             , label = Element.Input.labelAbove [] <| Element.text ""
             , spellcheck = False
             }
 
 
-parsedScript model =
-    model
-        |> String.split "\n"
-        |> List.map Element.text
-        |> List.map List.singleton
-        |> List.map (Element.paragraph [])
+scriptPiecesView : Model -> Element Msg
+scriptPiecesView { scriptPieces } =
+    scriptPieces
+        |> List.map scriptPieceView
         |> Element.textColumn [ Element.spacing 5, Element.padding 40 ]
+
+
+scriptPieceView : ScriptPiece -> Element Msg
+scriptPieceView scriptPiece =
+    case scriptPiece of
+        UnsurePiece u ->
+            Element.paragraph [] [ Element.text u ]
+
+        _ ->
+            Element.none
+
+
+
+--  ____            _       _     ____                _
+-- / ___|  ___ _ __(_)_ __ | |_  |  _ \ __ _ _ __ ___(_)_ __   __ _
+-- \___ \ / __| '__| | '_ \| __| | |_) / _` | '__/ __| | '_ \ / _` |
+--  ___) | (__| |  | | |_) | |_  |  __/ (_| | |  \__ \ | | | | (_| |
+-- |____/ \___|_|  |_| .__/ \__| |_|   \__,_|_|  |___/_|_| |_|\__, |
+--                   |_|                                      |___/
+
+
+type ScriptPiece
+    = UnsurePiece String
+    | IgnorePiece String
+    | CharacterPiece String
+    | LinePiece String
+    | StageDirectionPiece String
+
+
+scriptPiecesFromPlainScript : String -> List ScriptPiece
+scriptPiecesFromPlainScript plain =
+    plain
+        |> String.split "\n"
+        |> List.map UnsurePiece
+
+
+type ParseState
+    = StartingParse
+    | Parsed (List ScriptLine)
+    | AddingLine (List ScriptLine) { characterName : String, lineSoFar : String }
+    | FailedParse String
+
+
+parseScriptHelper : ScriptPiece -> ParseState -> ParseState
+parseScriptHelper scriptPiece state =
+    case ( scriptPiece, state ) of
+        ( _, FailedParse f ) ->
+            FailedParse f
+
+        ( UnsurePiece u, _ ) ->
+            FailedParse ("Encountered UnsurePiece: " ++ u)
+
+        ( IgnorePiece _, _ ) ->
+            state
+
+        ( StageDirectionPiece _, _ ) ->
+            state
+
+        ( CharacterPiece character, StartingParse ) ->
+            AddingLine [] { characterName = character, lineSoFar = "" }
+
+        ( CharacterPiece character, Parsed lines ) ->
+            AddingLine lines { characterName = character, lineSoFar = "" }
+
+        ( CharacterPiece character, AddingLine lines { characterName, lineSoFar } ) ->
+            if lineSoFar == "" then
+                FailedParse
+                    ("Encountered two Character Pieces in a row: "
+                        ++ character
+                        ++ " and "
+                        ++ characterName
+                    )
+
+            else
+                Parsed (lines ++ [ { speaker = characterName, identifier = "", line = lineSoFar } ])
+
+        ( LinePiece l, StartingParse ) ->
+            FailedParse ("Encountered Line Piece without preceding Character Piece: " ++ l)
+
+        ( LinePiece l, Parsed _ ) ->
+            FailedParse ("Encountered Line Piece without preceding Character Piece: " ++ l)
+
+        ( LinePiece l, AddingLine lines { characterName, lineSoFar } ) ->
+            AddingLine lines { characterName = characterName, lineSoFar = lineSoFar ++ l }
+
+
+parseScript : List ScriptPiece -> Result String Script
+parseScript scriptPieces =
+    case List.foldl parseScriptHelper StartingParse scriptPieces of
+        FailedParse s ->
+            Err s
+
+        Parsed l ->
+            Ok (Script "Exported Script" l)
+
+        AddingLine _ _ ->
+            Err "Parse parseScriptHelper ended unexeptedly on AddingLine"
+
+        StartingParse ->
+            Err "Parse parseScriptHelper ended unexpectedly on StartingParse"
 
 
 
@@ -118,13 +230,13 @@ parsedScript model =
 --                   |_|                    |_|
 
 
-type alias Line =
+type alias ScriptLine =
     { speaker : String, identifier : String, line : String }
 
 
 type alias Script =
     { title : String
-    , lines : List Line
+    , lines : List ScriptLine
     }
 
 
@@ -146,7 +258,7 @@ scriptEncoder { title, lines } =
         [ ( "lines", Json.Encode.list (lineEncoder title) lines ) ]
 
 
-lineEncoder : String -> Line -> Json.Encode.Value
+lineEncoder : String -> ScriptLine -> Json.Encode.Value
 lineEncoder title { speaker, identifier, line } =
     Json.Encode.object
         [ ( "t", Json.Encode.string line )

@@ -41,17 +41,13 @@ import Palette
 --
 
 
-type alias ScriptParseApp msg =
+type alias ScriptParseApp model msg =
     -- Threaded through to seperate App from Elm Pages
-    Model -> { title : String, body : List (Element msg) }
+    model -> { title : String, body : List (Element msg) }
 
 
 type alias Rendered msg =
     Element msg
-
-
-type alias Model =
-    String
 
 
 manifest : Manifest.Config Pages.PathKey
@@ -114,7 +110,7 @@ markdownDocument =
 
 
 view :
-    ScriptParseApp msg
+    ScriptParseApp model msg
     -> List ( PagePath Pages.PathKey, Metadata )
     ->
         { path : PagePath Pages.PathKey
@@ -122,7 +118,7 @@ view :
         }
     ->
         StaticHttp.Request
-            { view : Model -> Rendered msg -> { title : String, body : Html msg }
+            { view : model -> Rendered msg -> { title : String, body : Html msg }
             , head : List (Head.Tag Pages.PathKey)
             }
 view scriptParseApp siteMetadata page =
@@ -135,8 +131,8 @@ view scriptParseApp siteMetadata page =
 
 
 pageView :
-    ScriptParseApp msg
-    -> Model
+    ScriptParseApp model msg
+    -> model
     -> List ( PagePath Pages.PathKey, Metadata )
     -> { path : PagePath Pages.PathKey, frontmatter : Metadata }
     -> Rendered msg
