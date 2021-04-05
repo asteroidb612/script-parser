@@ -1,0 +1,3 @@
+[submodule "vendor/elm-ui-widgets"]
+	path = vendor/elm-ui-widgets
+	url = https://github.com/Orasund/elm-ui-widgets.git
