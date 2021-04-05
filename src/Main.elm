@@ -3,6 +3,7 @@ module Main exposing (main)
 import Base64
 import Color
 import Element exposing (Element)
+import Element.Font
 import Element.Input
 import ElmPages exposing (canonicalSiteUrl, generateFiles, manifest, markdownDocument, view)
 import Json.Encode
@@ -52,18 +53,16 @@ type alias Rendered =
 
 type Msg
     = Change String
-    | ShowHideCopyPaste
 
 
 type alias Model =
-    { plainScript : String, scriptPieces : List ScriptPiece, showCopyPaste : Bool }
+    { plainScript : String, scriptPieces : List ScriptPiece }
 
 
 init : ( Model, Cmd Msg )
 init =
     ( { plainScript = scene1
       , scriptPieces = scriptPiecesFromPlainScript scene1
-      , showCopyPaste = True
       }
     , Cmd.none
     )
@@ -79,9 +78,6 @@ update msg model =
               }
             , Cmd.none
             )
-
-        ShowHideCopyPaste ->
-            ( { model | showCopyPaste = not model.showCopyPaste }, Cmd.none )
 
 
 subscriptions : Metadata -> pages -> Model -> Sub msg
@@ -108,31 +104,15 @@ scriptParseApp model =
     { title = "Script Parser"
     , body =
         [ Element.column [ Element.width Element.fill ]
-            [ if model.plainScript /= "" then
-                Element.row [ Element.spacing 10, Element.padding 10 ]
-                    [ Widget.switch
-                        (Material.switch palette)
-                        { description = "Show or hide copy paste"
-                        , onPress = Just ShowHideCopyPaste
-                        , active = model.showCopyPaste
-                        }
-                    , Element.text "Show or hide copy paste"
-                    ]
-
-              else
-                Element.none
+            [ Element.el [ Element.width Element.fill ] (Element.text "Parse state")
             , Element.row
                 [ Element.width Element.fill ]
-                [ if model.showCopyPaste then
-                    Element.el [ Element.width Element.fill, Element.alignTop ] <| scriptEditor model
-
-                  else
-                    Element.none
-                , if model.plainScript /= "" then
+                [ if model.plainScript /= "" then
                     Element.el [ Element.width Element.fill, Element.alignTop ] <| scriptPiecesView model
 
                   else
                     Element.none
+                , Element.el [ Element.width Element.fill, Element.alignTop ] <| scriptEditor model
                 ]
             ]
         ]
@@ -141,7 +121,7 @@ scriptParseApp model =
 
 scriptEditor : Model -> Element Msg
 scriptEditor { plainScript } =
-    Element.el [ Element.width Element.fill ] <|
+    Element.el [ Element.width Element.fill, Element.Font.size 10 ] <|
         Element.Input.multiline []
             { onChange = Change
             , text = plainScript
@@ -155,7 +135,7 @@ scriptPiecesView : Model -> Element Msg
 scriptPiecesView { scriptPieces } =
     scriptPieces
         |> List.map scriptPieceView
-        |> Element.textColumn [ Element.spacing 5, Element.padding 40 ]
+        |> Element.textColumn [ Element.spacing 5, Element.padding 20 ]
 
 
 scriptPieceView : ScriptPiece -> Element Msg
