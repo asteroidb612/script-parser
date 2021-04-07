@@ -108,7 +108,34 @@ scriptParseApp model =
     { title = "CueCannon - Script Parser"
     , body =
         [ Element.column [ Element.width Element.fill ]
-            [ bar model
+            [ case parseScript model.scriptPieces of
+                Err s ->
+                    Widget.buttonBar
+                        (Material.buttonBar
+                            [ { icon =
+                                    Material.Icons.bug_report
+                                        |> Widget.Icon.elmMaterialIcons Color
+                              , text = "Error parsing: " ++ s
+                              , onPress = Just (Change "")
+                              }
+                            ]
+                            palette
+                        )
+                        barConfig
+
+                Ok href ->
+                    Widget.buttonBar
+                        (Material.buttonBar
+                            [ { icon =
+                                    Material.Icons.upgrade
+                                        |> Widget.Icon.elmMaterialIcons Color
+                              , text = "Open script in app"
+                              , onPress = Just (Export (cueCannonUrl href))
+                              }
+                            ]
+                            palette
+                        )
+                        barConfig
             , Element.row
                 [ Element.width Element.fill ]
                 [ if model.plainScript /= "" then
@@ -174,46 +201,5 @@ iconWrapper icon =
     Widget.Icon.elmMaterialIcons Color icon { size = 20, color = Color.blue }
 
 
-menuStyle =
-    let
-        p =
-            Material.menuBar palette
-
-        x =
-            p.content.menu
-                |> Debug.log "menuBar"
-    in
-    p
-
-
-bar : Model -> Element Msg
-bar model =
-    Widget.menuBar menuStyle
-        { title =
-            "Script Parser"
-                |> Element.text
-        , deviceClass = Desktop
-        , openRightSheet = Nothing
-        , openLeftSheet = Nothing
-        , openTopSheet = Nothing
-        , primaryActions =
-            case parseScript model.scriptPieces of
-                Err s ->
-                    [ { icon =
-                            Material.Icons.bug_report
-                                |> Widget.Icon.elmMaterialIcons Color
-                      , text = "Error parsing: " ++ s
-                      , onPress = Just (Change "")
-                      }
-                    ]
-
-                Ok href ->
-                    [ { icon =
-                            Material.Icons.upgrade
-                                |> Widget.Icon.elmMaterialIcons Color
-                      , text = "Open script in app"
-                      , onPress = Just (Export (cueCannonUrl href))
-                      }
-                    ]
-        , search = Nothing
-        }
+barConfig =
+    { deviceClass = Desktop, openLeftSheet = Nothing, openRightSheet = Nothing, openTopSheet = Nothing, primaryActions = [], search = Nothing, title = Element.text "Hello" }
