@@ -28,8 +28,7 @@ view document page =
             [ Element.width Element.fill ]
             [ header page.path
             , Element.column
-                [ Element.padding 3
-                , Element.spacing 4
+                [ Element.spacing 4
                 , Element.Region.mainContent
                 , Element.width Element.fill
                 , Element.centerX
@@ -64,7 +63,7 @@ header currentPath =
                             { src = ImagePath.toString images.iconPng
                             , description = "Icon of theater masks"
                             }
-                        , Element.text "Script Parser"
+                        , Element.text "CueCannon"
                         ]
                 }
             , Element.row [ Element.spacing 15 ]
