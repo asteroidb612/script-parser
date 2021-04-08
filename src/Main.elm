@@ -160,7 +160,7 @@ topBar model =
         ( leftButtons, rightButtons ) =
             case parseScript model.scriptPieces of
                 Err s ->
-                    ( [ unsureButton, characterButton, lineButton, ignoreButton, stageDirectionButton ]
+                    ( scriptPieceButtons
                     , [ { icon =
                             Material.Icons.bug_report
                                 |> Widget.Icon.elmMaterialIcons Color
@@ -184,39 +184,51 @@ topBar model =
     buttonWrapper leftButtons rightButtons
 
 
-unsureButton =
-    { icon = Material.Icons.dangerous |> Widget.Icon.elmMaterialIcons Color
-    , text = "Unsure"
-    , onPress = Just (Change "")
-    }
+scriptPieceButtons =
+    [ UnsurePiece "", CharacterPiece "", LinePiece "", IgnorePiece "", StageDirectionPiece "" ]
+        |> List.map
+            (\x ->
+                { icon = iconFromScriptPiece x |> Widget.Icon.elmMaterialIcons Color
+                , text = labelFromScriptPiece x
+                , onPress = Just (Change "")
+                }
+            )
 
 
-characterButton =
-    { icon = Material.Icons.face |> Widget.Icon.elmMaterialIcons Color
-    , text = "Character"
-    , onPress = Just (Change "")
-    }
+iconFromScriptPiece piece =
+    case piece of
+        UnsurePiece _ ->
+            Material.Icons.dangerous
+
+        CharacterPiece _ ->
+            Material.Icons.face
+
+        LinePiece _ ->
+            Material.Icons.receipt
+
+        IgnorePiece _ ->
+            Material.Icons.border_clear
+
+        StageDirectionPiece _ ->
+            Material.Icons.directions
 
 
-lineButton =
-    { icon = Material.Icons.receipt |> Widget.Icon.elmMaterialIcons Color
-    , text = "Line"
-    , onPress = Just (Change "")
-    }
+labelFromScriptPiece piece =
+    case piece of
+        UnsurePiece _ ->
+            "Unsure"
 
+        CharacterPiece _ ->
+            "Character"
 
-ignoreButton =
-    { icon = Material.Icons.border_clear |> Widget.Icon.elmMaterialIcons Color
-    , text = "Ignore"
-    , onPress = Just (Change "")
-    }
+        LinePiece _ ->
+            "Line"
 
+        IgnorePiece _ ->
+            "Ignore"
 
-stageDirectionButton =
-    { icon = Material.Icons.directions |> Widget.Icon.elmMaterialIcons Color
-    , text = "Stage Direction"
-    , onPress = Just (Change "")
-    }
+        StageDirectionPiece _ ->
+            "Stage Direction"
 
 
 buttonWrapper leftButtons rightButtons =
@@ -283,30 +295,30 @@ scriptPieceView selectedPieceIndex index scriptPiece =
                         []
                    )
 
-        viewHelper scriptLine icon =
+        viewHelper scriptLine =
             Element.row style
-                [ iconWrapper icon
-                , Element.text (String.fromInt (index + 1))
+                [ iconWrapper (iconFromScriptPiece scriptPiece)
+
+                -- , Element.text (String.fromInt (index + 1))
                 , Element.paragraph [] [ Element.text scriptLine ]
                 ]
     in
     case scriptPiece of
         UnsurePiece u ->
-            viewHelper u Material.Icons.dangerous
+            viewHelper u
 
         IgnorePiece i ->
-            viewHelper i Material.Icons.dangerous
+            viewHelper i
 
         CharacterPiece c ->
-            viewHelper c Material.Icons.dangerous
+            viewHelper c
 
         LinePiece l ->
-            viewHelper l Material.Icons.dangerous
+            viewHelper l
 
         StageDirectionPiece s ->
-            viewHelper s Material.Icons.dangerous
+            viewHelper s
 
 
-iconWrapper : Material.Icons.Types.Icon Msg -> Element Msg
 iconWrapper icon =
     Widget.Icon.elmMaterialIcons Color icon { size = 20, color = palette.error }

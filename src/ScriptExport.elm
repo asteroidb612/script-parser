@@ -78,7 +78,14 @@ scriptPiecesFromPlainScript plain =
     else
         plain
             |> String.split "\n"
-            |> List.map UnsurePiece
+            |> List.map
+                (\x ->
+                    if x == "" then
+                        IgnorePiece x
+
+                    else
+                        UnsurePiece x
+                )
 
 
 type ParseState
