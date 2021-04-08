@@ -160,7 +160,7 @@ topBar model =
         ( leftButtons, rightButtons ) =
             case parseScript model.scriptPieces of
                 Err s ->
-                    ( [ easyButton, easyButton, easyButton ]
+                    ( [ unsureButton, characterButton, lineButton, ignoreButton, stageDirectionButton ]
                     , [ { icon =
                             Material.Icons.bug_report
                                 |> Widget.Icon.elmMaterialIcons Color
@@ -184,9 +184,37 @@ topBar model =
     buttonWrapper leftButtons rightButtons
 
 
-easyButton =
-    { icon = Material.Icons.done |> Widget.Icon.elmMaterialIcons Color
-    , text = "That was easy"
+unsureButton =
+    { icon = Material.Icons.dangerous |> Widget.Icon.elmMaterialIcons Color
+    , text = "Unsure"
+    , onPress = Just (Change "")
+    }
+
+
+characterButton =
+    { icon = Material.Icons.face |> Widget.Icon.elmMaterialIcons Color
+    , text = "Character"
+    , onPress = Just (Change "")
+    }
+
+
+lineButton =
+    { icon = Material.Icons.receipt |> Widget.Icon.elmMaterialIcons Color
+    , text = "Line"
+    , onPress = Just (Change "")
+    }
+
+
+ignoreButton =
+    { icon = Material.Icons.border_clear |> Widget.Icon.elmMaterialIcons Color
+    , text = "Ignore"
+    , onPress = Just (Change "")
+    }
+
+
+stageDirectionButton =
+    { icon = Material.Icons.directions |> Widget.Icon.elmMaterialIcons Color
+    , text = "Stage Direction"
     , onPress = Just (Change "")
     }
 

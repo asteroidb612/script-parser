@@ -67,8 +67,10 @@ header currentPath =
                         ]
                 }
             , Element.row [ Element.spacing 15 ]
-                [ githubRepoLink
+                [ highlightableLink currentPath Pages.pages.blog.directory "App"
+                , highlightableLink currentPath Pages.pages.blog.directory "Script Editor"
                 , highlightableLink currentPath Pages.pages.blog.directory "Blog"
+                , githubRepoLink
                 ]
             ]
         ]
