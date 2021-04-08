@@ -72,9 +72,13 @@ type ScriptPiece
 
 scriptPiecesFromPlainScript : String -> List ScriptPiece
 scriptPiecesFromPlainScript plain =
-    plain
-        |> String.split "\n"
-        |> List.map UnsurePiece
+    if plain == "" then
+        []
+
+    else
+        plain
+            |> String.split "\n"
+            |> List.map UnsurePiece
 
 
 type ParseState
@@ -140,4 +144,4 @@ parseScript scriptPieces =
             Err "Parse parseScriptHelper ended unexeptedly on AddingLine"
 
         StartingParse ->
-            Err "Parse parseScriptHelper ended unexpectedly on StartingParse"
+            Err "No script"

@@ -3,9 +3,12 @@ module Main exposing (main)
 import Browser.Navigation as Nav
 import Color
 import Element exposing (DeviceClass(..), Element)
+import Element.Background
+import Element.Events
 import Element.Font
 import Element.Input
 import ElmPages exposing (canonicalSiteUrl, generateFiles, manifest, markdownDocument, view)
+import List.Extra
 import Macbeth exposing (scene1)
 import Material.Icons exposing (offline_bolt)
 import Material.Icons.Types exposing (Coloring(..))
@@ -16,6 +19,7 @@ import ScriptExport exposing (ScriptPiece(..), cueCannonUrl, parseScript, script
 import Widget
 import Widget.Icon exposing (Icon)
 import Widget.Material as Material exposing (defaultPalette)
+import Widget.Material.Color
 
 
 
@@ -54,16 +58,19 @@ type alias Rendered =
 type Msg
     = Change String
     | Export String
+    | SelectPiece Int
+    | NextError
 
 
 type alias Model =
-    { plainScript : String, scriptPieces : List ScriptPiece }
+    { plainScript : String, scriptPieces : List ScriptPiece, selectedPiece : Maybe Int }
 
 
 init : ( Model, Cmd Msg )
 init =
     ( { plainScript = scene1
       , scriptPieces = scriptPiecesFromPlainScript scene1
+      , selectedPiece = Nothing
       }
     , Cmd.none
     )
@@ -82,6 +89,30 @@ update msg model =
 
         Export href ->
             ( model, Nav.load href )
+
+        NextError ->
+            let
+                isError piece =
+                    case piece of
+                        UnsurePiece _ ->
+                            True
+
+                        _ ->
+                            False
+            in
+            case List.Extra.findIndex isError model.scriptPieces of
+                Just piece ->
+                    ( { model | selectedPiece = Just piece }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        SelectPiece i ->
+            if List.length model.scriptPieces > i && i >= 0 then
+                ( { model | selectedPiece = Just i }, Cmd.none )
+
+            else
+                ( model, Cmd.none )
 
 
 subscriptions : Metadata -> pages -> Model -> Sub msg
@@ -108,34 +139,7 @@ scriptParseApp model =
     { title = "CueCannon - Script Parser"
     , body =
         [ Element.column [ Element.width Element.fill ]
-            [ case parseScript model.scriptPieces of
-                Err s ->
-                    Widget.buttonBar
-                        (Material.buttonBar
-                            [ { icon =
-                                    Material.Icons.bug_report
-                                        |> Widget.Icon.elmMaterialIcons Color
-                              , text = "Error parsing: " ++ s
-                              , onPress = Just (Change "")
-                              }
-                            ]
-                            palette
-                        )
-                        barConfig
-
-                Ok href ->
-                    Widget.buttonBar
-                        (Material.buttonBar
-                            [ { icon =
-                                    Material.Icons.upgrade
-                                        |> Widget.Icon.elmMaterialIcons Color
-                              , text = "Open script in app"
-                              , onPress = Just (Export (cueCannonUrl href))
-                              }
-                            ]
-                            palette
-                        )
-                        barConfig
+            [ topBar model
             , Element.row
                 [ Element.width Element.fill ]
                 [ if model.plainScript /= "" then
@@ -150,21 +154,74 @@ scriptParseApp model =
     }
 
 
+topBar : Model -> Element Msg
+topBar model =
+    let
+        ( leftButtons, rightButtons ) =
+            case parseScript model.scriptPieces of
+                Err s ->
+                    ( [ easyButton, easyButton, easyButton ]
+                    , [ { icon =
+                            Material.Icons.bug_report
+                                |> Widget.Icon.elmMaterialIcons Color
+                        , text = "Errors found: fix before export"
+                        , onPress = Just NextError
+                        }
+                      ]
+                    )
+
+                Ok href ->
+                    ( []
+                    , [ { icon =
+                            Material.Icons.upgrade
+                                |> Widget.Icon.elmMaterialIcons Color
+                        , text = "Open script in app"
+                        , onPress = Just (Export (cueCannonUrl href))
+                        }
+                      ]
+                    )
+    in
+    buttonWrapper leftButtons rightButtons
+
+
+easyButton =
+    { icon = Material.Icons.done |> Widget.Icon.elmMaterialIcons Color
+    , text = "That was easy"
+    , onPress = Just (Change "")
+    }
+
+
+buttonWrapper leftButtons rightButtons =
+    Widget.buttonBar (Material.buttonBar leftButtons palette) (barConfig rightButtons)
+
+
+barConfig actions =
+    { deviceClass = Desktop
+    , openLeftSheet = Nothing
+    , openRightSheet = Nothing
+    , openTopSheet = Nothing
+    , primaryActions = actions
+    , search = Nothing
+    , title = Element.text "Hello"
+    }
+
+
 scriptEditor : Model -> Element Msg
 scriptEditor { plainScript } =
     let
-        fontSize =
+        ( fontSize, width ) =
             if plainScript /= "" then
-                12
+                ( 12, Element.px 350 )
 
             else
-                18
+                ( 18, Element.fill )
     in
     Element.el
-        [ Element.width (Element.px 350)
+        [ Element.width width
         , Element.alignRight
         , Element.alignTop
         , Element.Font.size fontSize
+        , Element.paddingXY 10 0
         ]
     <|
         Element.Input.multiline []
@@ -177,29 +234,51 @@ scriptEditor { plainScript } =
 
 
 scriptPiecesView : Model -> Element Msg
-scriptPiecesView { scriptPieces } =
+scriptPiecesView { scriptPieces, selectedPiece } =
     scriptPieces
-        |> List.map scriptPieceView
+        |> List.indexedMap (scriptPieceView selectedPiece)
         |> Element.textColumn [ Element.spacing 5, Element.padding 20 ]
 
 
-scriptPieceView : ScriptPiece -> Element Msg
-scriptPieceView scriptPiece =
+scriptPieceView : Maybe Int -> Int -> ScriptPiece -> Element Msg
+scriptPieceView selectedPieceIndex index scriptPiece =
+    let
+        style =
+            [ Element.spacing 10
+            , Element.Events.onClick (SelectPiece index)
+            ]
+                ++ (if selectedPieceIndex == Just index then
+                        Widget.Material.Color.textAndBackground
+                            (Widget.Material.Color.fromCIELCH { l = 94, c = 50, h = 83 })
+
+                    else
+                        []
+                   )
+
+        viewHelper scriptLine icon =
+            Element.row style
+                [ iconWrapper icon
+                , Element.text (String.fromInt (index + 1))
+                , Element.paragraph [] [ Element.text scriptLine ]
+                ]
+    in
     case scriptPiece of
         UnsurePiece u ->
-            Element.row [ Element.spacing 10 ]
-                [ iconWrapper Material.Icons.dangerous
-                , Element.paragraph [] [ Element.text u ]
-                ]
+            viewHelper u Material.Icons.dangerous
 
-        _ ->
-            Element.none
+        IgnorePiece i ->
+            viewHelper i Material.Icons.dangerous
+
+        CharacterPiece c ->
+            viewHelper c Material.Icons.dangerous
+
+        LinePiece l ->
+            viewHelper l Material.Icons.dangerous
+
+        StageDirectionPiece s ->
+            viewHelper s Material.Icons.dangerous
 
 
 iconWrapper : Material.Icons.Types.Icon Msg -> Element Msg
 iconWrapper icon =
-    Widget.Icon.elmMaterialIcons Color icon { size = 20, color = Color.blue }
-
-
-barConfig =
-    { deviceClass = Desktop, openLeftSheet = Nothing, openRightSheet = Nothing, openTopSheet = Nothing, primaryActions = [], search = Nothing, title = Element.text "Hello" }
+    Widget.Icon.elmMaterialIcons Color icon { size = 20, color = palette.error }
