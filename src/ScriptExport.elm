@@ -68,6 +68,7 @@ type ScriptPiece
     | CharacterPiece String
     | LinePiece String
     | StageDirectionPiece String
+    | TitlePiece String
 
 
 scriptPiecesFromPlainScript : String -> List ScriptPiece
@@ -90,9 +91,14 @@ scriptPiecesFromPlainScript plain =
 
 type ParseState
     = StartingParse
-    | Parsed (List ScriptLine)
-    | AddingLine (List ScriptLine) { characterName : String, lineSoFar : String }
+    | Parsed String (List ScriptLine)
+    | AddingLine String (List ScriptLine) { characterName : String, lineSoFar : String }
     | FailedParse String
+
+
+startingTitle : String
+startingTitle =
+    "Untitled"
 
 
 parseScriptHelper : ScriptPiece -> ParseState -> ParseState
@@ -108,15 +114,30 @@ parseScriptHelper scriptPiece state =
             state
 
         ( StageDirectionPiece _, _ ) ->
+            -- Ignore stage directions for now
             state
 
+        ( TitlePiece t, StartingParse ) ->
+            Parsed t []
+
+        ( TitlePiece t, Parsed oldTitle _ ) ->
+            FailedParse
+                ("Encountered two titles: "
+                    ++ t
+                    ++ " and "
+                    ++ oldTitle
+                )
+
+        ( TitlePiece _, AddingLine _ _ _ ) ->
+            FailedParse "Encountered"
+
         ( CharacterPiece character, StartingParse ) ->
-            AddingLine [] { characterName = character, lineSoFar = "" }
+            AddingLine startingTitle [] { characterName = character, lineSoFar = "" }
 
-        ( CharacterPiece character, Parsed lines ) ->
-            AddingLine lines { characterName = character, lineSoFar = "" }
+        ( CharacterPiece character, Parsed title lines ) ->
+            AddingLine title lines { characterName = character, lineSoFar = "" }
 
-        ( CharacterPiece character, AddingLine lines { characterName, lineSoFar } ) ->
+        ( CharacterPiece character, AddingLine title lines { characterName, lineSoFar } ) ->
             if lineSoFar == "" then
                 FailedParse
                     ("Encountered two Character Pieces in a row: "
@@ -126,16 +147,16 @@ parseScriptHelper scriptPiece state =
                     )
 
             else
-                Parsed (lines ++ [ { speaker = characterName, identifier = "", line = lineSoFar } ])
+                Parsed title (lines ++ [ { speaker = characterName, identifier = "", line = lineSoFar } ])
 
         ( LinePiece l, StartingParse ) ->
             FailedParse ("Encountered Line Piece without preceding Character Piece: " ++ l)
 
-        ( LinePiece l, Parsed _ ) ->
+        ( LinePiece l, Parsed _ _ ) ->
             FailedParse ("Encountered Line Piece without preceding Character Piece: " ++ l)
 
-        ( LinePiece l, AddingLine lines { characterName, lineSoFar } ) ->
-            AddingLine lines { characterName = characterName, lineSoFar = lineSoFar ++ l }
+        ( LinePiece l, AddingLine title lines { characterName, lineSoFar } ) ->
+            AddingLine title lines { characterName = characterName, lineSoFar = lineSoFar ++ l }
 
 
 parseScript : List ScriptPiece -> Result String Script
@@ -144,10 +165,10 @@ parseScript scriptPieces =
         FailedParse s ->
             Err s
 
-        Parsed l ->
-            Ok (Script "Exported Script" l)
+        Parsed title l ->
+            Ok (Script title l)
 
-        AddingLine _ _ ->
+        AddingLine _ _ _ ->
             Err "Parse parseScriptHelper ended unexeptedly on AddingLine"
 
         StartingParse ->

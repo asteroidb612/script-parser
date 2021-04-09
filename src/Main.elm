@@ -60,10 +60,19 @@ type Msg
     | Export String
     | SelectPiece Int
     | NextError
+    | LabelMouseEnter Int
+    | LabelMouseLeave
 
 
 type alias Model =
-    { plainScript : String, scriptPieces : List ScriptPiece, selectedPiece : Maybe Int }
+    -- Script data
+    { plainScript : String
+    , scriptPieces : List ScriptPiece
+
+    -- View data
+    , selectedPiece : Maybe Int
+    , labelMouseOver : Maybe Int
+    }
 
 
 init : ( Model, Cmd Msg )
@@ -71,6 +80,7 @@ init =
     ( { plainScript = scene1
       , scriptPieces = scriptPiecesFromPlainScript scene1
       , selectedPiece = Nothing
+      , labelMouseOver = Nothing
       }
     , Cmd.none
     )
@@ -79,16 +89,19 @@ init =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        Change s ->
-            ( { model
-                | plainScript = s
-                , scriptPieces = scriptPiecesFromPlainScript s
-              }
-            , Cmd.none
-            )
+        -- UI Changes
+        LabelMouseEnter i ->
+            ( { model | labelMouseOver = Just i }, Cmd.none )
 
-        Export href ->
-            ( model, Nav.load href )
+        LabelMouseLeave ->
+            ( { model | labelMouseOver = Nothing }, Cmd.none )
+
+        SelectPiece i ->
+            if List.length model.scriptPieces > i && i >= 0 then
+                ( { model | selectedPiece = Just i }, Cmd.none )
+
+            else
+                ( model, Cmd.none )
 
         NextError ->
             let
@@ -107,12 +120,18 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
-        SelectPiece i ->
-            if List.length model.scriptPieces > i && i >= 0 then
-                ( { model | selectedPiece = Just i }, Cmd.none )
+        -- Editing script and script pieces
+        Export href ->
+            ( model, Nav.load href )
 
-            else
-                ( model, Cmd.none )
+        Change s ->
+            -- FIXME overwrites script pieces, implement merge
+            ( { model
+                | plainScript = s
+                , scriptPieces = scriptPiecesFromPlainScript s
+              }
+            , Cmd.none
+            )
 
 
 subscriptions : Metadata -> pages -> Model -> Sub msg
@@ -185,12 +204,12 @@ topBar model =
 
 
 scriptPieceButtons =
-    [ UnsurePiece "", CharacterPiece "", LinePiece "", IgnorePiece "", StageDirectionPiece "" ]
+    [ UnsurePiece "", CharacterPiece "", LinePiece "", IgnorePiece "", StageDirectionPiece "", TitlePiece "" ]
         |> List.map
             (\x ->
                 { icon = iconFromScriptPiece x |> Widget.Icon.elmMaterialIcons Color
                 , text = labelFromScriptPiece x
-                , onPress = Just (Change "")
+                , onPress = Just NextError
                 }
             )
 
@@ -212,6 +231,9 @@ iconFromScriptPiece piece =
         StageDirectionPiece _ ->
             Material.Icons.directions
 
+        TitlePiece _ ->
+            Material.Icons.grading
+
 
 labelFromScriptPiece piece =
     case piece of
@@ -229,6 +251,9 @@ labelFromScriptPiece piece =
 
         StageDirectionPiece _ ->
             "Stage Direction"
+
+        TitlePiece _ ->
+            "Title"
 
 
 buttonWrapper leftButtons rightButtons =
@@ -274,20 +299,21 @@ scriptEditor { plainScript } =
 
 
 scriptPiecesView : Model -> Element Msg
-scriptPiecesView { scriptPieces, selectedPiece } =
+scriptPiecesView { scriptPieces, selectedPiece, labelMouseOver } =
     scriptPieces
-        |> List.indexedMap (scriptPieceView selectedPiece)
+        |> List.indexedMap (scriptPieceView selectedPiece labelMouseOver)
         |> Element.textColumn [ Element.spacing 5, Element.padding 20 ]
 
 
-scriptPieceView : Maybe Int -> Int -> ScriptPiece -> Element Msg
-scriptPieceView selectedPieceIndex index scriptPiece =
+scriptPieceView : Maybe Int -> Maybe Int -> Int -> ScriptPiece -> Element Msg
+scriptPieceView selectedPieceIndex labelIndex index scriptPiece =
     let
         style =
-            [ Element.spacing 10
-            , Element.Events.onClick (SelectPiece index)
-            ]
-                ++ (if selectedPieceIndex == Just index then
+            Element.spacing 60
+                :: Element.pointer
+                :: Element.mouseOver [ Element.scale 1.01 ]
+                :: Element.Events.onClick (SelectPiece index)
+                :: (if selectedPieceIndex == Just index then
                         Widget.Material.Color.textAndBackground
                             (Widget.Material.Color.fromCIELCH { l = 94, c = 50, h = 83 })
 
@@ -295,12 +321,30 @@ scriptPieceView selectedPieceIndex index scriptPiece =
                         []
                    )
 
+        labelHelper =
+            Element.text (labelFromScriptPiece scriptPiece)
+
+        mouseOverHelper =
+            Element.Events.onMouseEnter (LabelMouseEnter index)
+                :: Element.Events.onMouseLeave LabelMouseLeave
+                :: (if labelIndex == Just index then
+                        [ Element.onLeft labelHelper ]
+
+                    else
+                        []
+                   )
+
+        iconHelper =
+            Element.el
+                mouseOverHelper
+                (iconWrapper (iconFromScriptPiece scriptPiece))
+
         viewHelper scriptLine =
             Element.row style
-                [ iconWrapper (iconFromScriptPiece scriptPiece)
+                [ Element.paragraph [] [ Element.text scriptLine ]
+                , iconHelper
 
                 -- , Element.text (String.fromInt (index + 1))
-                , Element.paragraph [] [ Element.text scriptLine ]
                 ]
     in
     case scriptPiece of
@@ -318,6 +362,9 @@ scriptPieceView selectedPieceIndex index scriptPiece =
 
         StageDirectionPiece s ->
             viewHelper s
+
+        TitlePiece t ->
+            viewHelper t
 
 
 iconWrapper icon =
