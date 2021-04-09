@@ -15,7 +15,7 @@ import Material.Icons.Types exposing (Coloring(..))
 import Metadata exposing (Metadata)
 import Pages exposing (images, pages)
 import Pages.Platform
-import ScriptExport exposing (ScriptPiece(..), cueCannonUrl, parseScript, scriptPiecesFromPlainScript)
+import ScriptExport exposing (ScriptPiece(..), ScriptPieceKind(..), cueCannonUrl, parseScript, scriptPiecesFromPlainScript)
 import Widget
 import Widget.Icon exposing (Icon)
 import Widget.Material as Material exposing (defaultPalette)
@@ -58,8 +58,9 @@ type alias Rendered =
 type
     Msg
     -- Script actions
-    = Change String
+    = ChangeScript String
     | Export String
+    | ChangeScriptPiece ScriptPieceKind
       -- View actions
     | SelectPiece Int
     | NextError
@@ -96,7 +97,7 @@ update msg model =
         Export href ->
             ( model, Nav.load href )
 
-        Change s ->
+        ChangeScript s ->
             -- FIXME overwrites script pieces, implement merge
             ( { model
                 | plainScript = s
@@ -104,6 +105,22 @@ update msg model =
               }
             , Cmd.none
             )
+
+        ChangeScriptPiece newKind ->
+            case model.selectedPiece of
+                Just i ->
+                    let
+                        changeScriptPieceType (ScriptPiece _ line) =
+                            ScriptPiece newKind line
+
+                        newScriptPieces =
+                            model.scriptPieces
+                                |> List.Extra.updateAt i changeScriptPieceType
+                    in
+                    ( { model | scriptPieces = newScriptPieces }, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
 
         -- UI Changes
         LabelMouseEnter i ->
@@ -120,16 +137,7 @@ update msg model =
                 ( model, Cmd.none )
 
         NextError ->
-            let
-                isError piece =
-                    case piece of
-                        UnsurePiece _ ->
-                            True
-
-                        _ ->
-                            False
-            in
-            case List.Extra.findIndex isError model.scriptPieces of
+            case List.Extra.findIndex (\(ScriptPiece kind _) -> kind == UnsurePiece) model.scriptPieces of
                 Just piece ->
                     ( { model | selectedPiece = Just piece }, Cmd.none )
 
@@ -176,7 +184,7 @@ topBar : Model -> Element Msg
 topBar model =
     let
         ( leftButtons, rightButtons ) =
-            case parseScript model.scriptPieces of
+            case Debug.log "" (parseScript model.scriptPieces) of
                 Err s ->
                     ( scriptPieceButtons
                     , [ { icon =
@@ -221,7 +229,7 @@ scriptEditor { plainScript } =
         ]
     <|
         Element.Input.multiline []
-            { onChange = Change
+            { onChange = ChangeScript
             , text = plainScript
             , placeholder = Just (Element.Input.placeholder [] (Element.text "Paste a script here to parse into cues!"))
             , label = Element.Input.labelAbove [] <| Element.text ""
@@ -237,7 +245,7 @@ scriptPiecesView { scriptPieces, selectedPiece, labelMouseOver } =
 
 
 scriptPieceView : Maybe Int -> Maybe Int -> Int -> ScriptPiece -> Element Msg
-scriptPieceView selectedPieceIndex labelIndex index scriptPiece =
+scriptPieceView selectedPieceIndex labelIndex index (ScriptPiece kind line) =
     let
         style =
             Element.spacing 60
@@ -253,7 +261,7 @@ scriptPieceView selectedPieceIndex labelIndex index scriptPiece =
                    )
 
         labelHelper =
-            Element.text (labelFromScriptPiece scriptPiece)
+            Element.text (labelFromScriptPiece kind)
 
         mouseOverHelper =
             Element.Events.onMouseEnter (LabelMouseEnter index)
@@ -267,8 +275,8 @@ scriptPieceView selectedPieceIndex labelIndex index scriptPiece =
 
         iconHelper =
             Element.el mouseOverHelper <|
-                Widget.Icon.elmMaterialIcons Color (iconFromScriptPiece scriptPiece) <|
-                    { size = 20, color = colorFromScriptPiece scriptPiece }
+                Widget.Icon.elmMaterialIcons Color (iconFromScriptPiece kind) <|
+                    { size = 20, color = colorFromScriptPiece kind }
 
         viewHelper scriptLine =
             Element.row style
@@ -278,24 +286,7 @@ scriptPieceView selectedPieceIndex labelIndex index scriptPiece =
                 -- , Element.text (String.fromInt (index + 1))
                 ]
     in
-    case scriptPiece of
-        UnsurePiece u ->
-            viewHelper u
-
-        IgnorePiece i ->
-            viewHelper i
-
-        CharacterPiece c ->
-            viewHelper c
-
-        LinePiece l ->
-            viewHelper l
-
-        StageDirectionPiece s ->
-            viewHelper s
-
-        TitlePiece t ->
-            viewHelper t
+    viewHelper line
 
 
 
@@ -317,78 +308,83 @@ palette =
     { defaultPalette | primary = Color.black }
 
 
+allScriptPieceKinds : List ScriptPieceKind
+allScriptPieceKinds =
+    [ UnsurePiece, CharacterPiece, LinePiece, IgnorePiece, StageDirectionPiece, TitlePiece ]
+
+
 scriptPieceButtons =
-    [ UnsurePiece "", CharacterPiece "", LinePiece "", IgnorePiece "", StageDirectionPiece "", TitlePiece "" ]
+    allScriptPieceKinds
         |> List.map
             (\x ->
                 { icon = iconFromScriptPiece x |> Widget.Icon.elmMaterialIcons Color
                 , text = labelFromScriptPiece x
-                , onPress = Just NextError
+                , onPress = Just (ChangeScriptPiece x)
                 }
             )
 
 
-iconFromScriptPiece piece =
-    case piece of
-        UnsurePiece _ ->
+iconFromScriptPiece kind =
+    case kind of
+        UnsurePiece ->
             Material.Icons.dangerous
 
-        CharacterPiece _ ->
+        CharacterPiece ->
             Material.Icons.face
 
-        LinePiece _ ->
+        LinePiece ->
             Material.Icons.receipt
 
-        IgnorePiece _ ->
+        IgnorePiece ->
             Material.Icons.border_clear
 
-        StageDirectionPiece _ ->
+        StageDirectionPiece ->
             Material.Icons.directions
 
-        TitlePiece _ ->
+        TitlePiece ->
             Material.Icons.grading
 
 
-labelFromScriptPiece piece =
-    case piece of
-        UnsurePiece _ ->
+labelFromScriptPiece kind =
+    case kind of
+        UnsurePiece ->
             "Unsure"
 
-        CharacterPiece _ ->
+        CharacterPiece ->
             "Character"
 
-        LinePiece _ ->
+        LinePiece ->
             "Line"
 
-        IgnorePiece _ ->
+        IgnorePiece ->
             "Ignore"
 
-        StageDirectionPiece _ ->
+        StageDirectionPiece ->
             "Stage Direction"
 
-        TitlePiece _ ->
+        TitlePiece ->
             "Title"
 
 
-colorFromScriptPiece piece =
-    case piece of
-        UnsurePiece _ ->
+colorFromScriptPiece kind =
+    case kind of
+        UnsurePiece ->
             palette.error
 
-        CharacterPiece _ ->
-            palette.error
+        CharacterPiece ->
+            palette.primary
 
-        LinePiece _ ->
-            palette.error
+        LinePiece ->
+            palette.primary
 
-        IgnorePiece _ ->
+        IgnorePiece ->
             palette.on.error
 
-        StageDirectionPiece _ ->
-            palette.error
+        StageDirectionPiece ->
+            palette.on.error
 
-        TitlePiece _ ->
-            palette.error
+        TitlePiece ->
+            palette.primary
 
 
 buttonWrapper leftButtons rightButtons =

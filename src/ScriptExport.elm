@@ -1,4 +1,4 @@
-module ScriptExport exposing (ParseState(..), Script, ScriptLine, ScriptPiece(..), cueCannonUrl, parseScript, parseScriptHelper, scriptPiecesFromPlainScript)
+module ScriptExport exposing (ParseState(..), Script, ScriptLine, ScriptPiece(..), ScriptPieceKind(..), cueCannonUrl, parseScript, parseScriptHelper, scriptPiecesFromPlainScript)
 
 import Base64
 import Json.Encode
@@ -63,12 +63,18 @@ lineEncoder title { speaker, identifier, line } =
 
 
 type ScriptPiece
-    = UnsurePiece String
-    | IgnorePiece String
-    | CharacterPiece String
-    | LinePiece String
-    | StageDirectionPiece String
-    | TitlePiece String
+    = ScriptPiece ScriptPieceKind String
+
+
+type
+    ScriptPieceKind
+    -- FIXME Add "All" type
+    = UnsurePiece
+    | IgnorePiece
+    | CharacterPiece
+    | LinePiece
+    | StageDirectionPiece
+    | TitlePiece
 
 
 scriptPiecesFromPlainScript : String -> List ScriptPiece
@@ -82,10 +88,10 @@ scriptPiecesFromPlainScript plain =
             |> List.map
                 (\x ->
                     if x == "" then
-                        IgnorePiece x
+                        ScriptPiece IgnorePiece x
 
                     else
-                        UnsurePiece x
+                        ScriptPiece UnsurePiece x
                 )
 
 
@@ -102,46 +108,46 @@ startingTitle =
 
 
 parseScriptHelper : ScriptPiece -> ParseState -> ParseState
-parseScriptHelper scriptPiece state =
-    case ( scriptPiece, state ) of
+parseScriptHelper (ScriptPiece kind piece) state =
+    case ( kind, state ) of
         ( _, FailedParse f ) ->
             FailedParse f
 
-        ( UnsurePiece u, _ ) ->
-            FailedParse ("Encountered UnsurePiece: " ++ u)
+        ( UnsurePiece, _ ) ->
+            FailedParse ("Encountered UnsurePiece: " ++ piece)
 
-        ( IgnorePiece _, _ ) ->
+        ( IgnorePiece, _ ) ->
             state
 
-        ( StageDirectionPiece _, _ ) ->
+        ( StageDirectionPiece, _ ) ->
             -- Ignore stage directions for now
             state
 
-        ( TitlePiece t, StartingParse ) ->
-            Parsed t []
+        ( TitlePiece, StartingParse ) ->
+            Parsed piece []
 
-        ( TitlePiece t, Parsed oldTitle _ ) ->
+        ( TitlePiece, Parsed oldTitle _ ) ->
             FailedParse
                 ("Encountered two titles: "
-                    ++ t
+                    ++ piece
                     ++ " and "
                     ++ oldTitle
                 )
 
-        ( TitlePiece _, AddingLine _ _ _ ) ->
+        ( TitlePiece, AddingLine _ _ _ ) ->
             FailedParse "Encountered"
 
-        ( CharacterPiece character, StartingParse ) ->
-            AddingLine startingTitle [] { characterName = character, lineSoFar = "" }
+        ( CharacterPiece, StartingParse ) ->
+            AddingLine startingTitle [] { characterName = piece, lineSoFar = "" }
 
-        ( CharacterPiece character, Parsed title lines ) ->
-            AddingLine title lines { characterName = character, lineSoFar = "" }
+        ( CharacterPiece, Parsed title lines ) ->
+            AddingLine title lines { characterName = piece, lineSoFar = "" }
 
-        ( CharacterPiece character, AddingLine title lines { characterName, lineSoFar } ) ->
+        ( CharacterPiece, AddingLine title lines { characterName, lineSoFar } ) ->
             if lineSoFar == "" then
                 FailedParse
                     ("Encountered two Character Pieces in a row: "
-                        ++ character
+                        ++ piece
                         ++ " and "
                         ++ characterName
                     )
@@ -149,14 +155,14 @@ parseScriptHelper scriptPiece state =
             else
                 Parsed title (lines ++ [ { speaker = characterName, identifier = "", line = lineSoFar } ])
 
-        ( LinePiece l, StartingParse ) ->
-            FailedParse ("Encountered Line Piece without preceding Character Piece: " ++ l)
+        ( LinePiece, StartingParse ) ->
+            FailedParse ("Encountered Line Piece without preceding Character Piece: " ++ piece)
 
-        ( LinePiece l, Parsed _ _ ) ->
-            FailedParse ("Encountered Line Piece without preceding Character Piece: " ++ l)
+        ( LinePiece, Parsed _ _ ) ->
+            FailedParse ("Encountered Line Piece without preceding Character Piece: " ++ piece)
 
-        ( LinePiece l, AddingLine title lines { characterName, lineSoFar } ) ->
-            AddingLine title lines { characterName = characterName, lineSoFar = lineSoFar ++ l }
+        ( LinePiece, AddingLine title lines { characterName, lineSoFar } ) ->
+            AddingLine title lines { characterName = characterName, lineSoFar = lineSoFar ++ piece }
 
 
 parseScript : List ScriptPiece -> Result String Script
