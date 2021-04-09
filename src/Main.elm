@@ -55,9 +55,12 @@ type alias Rendered =
     Element Msg
 
 
-type Msg
+type
+    Msg
+    -- Script actions
     = Change String
     | Export String
+      -- View actions
     | SelectPiece Int
     | NextError
     | LabelMouseEnter Int
@@ -89,6 +92,19 @@ init =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        -- Editing script and script pieces
+        Export href ->
+            ( model, Nav.load href )
+
+        Change s ->
+            -- FIXME overwrites script pieces, implement merge
+            ( { model
+                | plainScript = s
+                , scriptPieces = scriptPiecesFromPlainScript s
+              }
+            , Cmd.none
+            )
+
         -- UI Changes
         LabelMouseEnter i ->
             ( { model | labelMouseOver = Just i }, Cmd.none )
@@ -120,19 +136,6 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
-        -- Editing script and script pieces
-        Export href ->
-            ( model, Nav.load href )
-
-        Change s ->
-            -- FIXME overwrites script pieces, implement merge
-            ( { model
-                | plainScript = s
-                , scriptPieces = scriptPiecesFromPlainScript s
-              }
-            , Cmd.none
-            )
-
 
 subscriptions : Metadata -> pages -> Model -> Sub msg
 subscriptions _ _ _ =
@@ -147,10 +150,6 @@ subscriptions _ _ _ =
 -- |____/ \___|_|  |_| .__/ \__| |_|_| |_|\__\___|_|  |_|  \__,_|\___\___|
 --                   |_|
 -- Script interface: A user can go through what they've copy-pasted and mark parts
-
-
-palette =
-    { defaultPalette | primary = Color.black }
 
 
 scriptParseApp : Model -> { title : String, body : List (Element Msg) }
@@ -201,74 +200,6 @@ topBar model =
                     )
     in
     buttonWrapper leftButtons rightButtons
-
-
-scriptPieceButtons =
-    [ UnsurePiece "", CharacterPiece "", LinePiece "", IgnorePiece "", StageDirectionPiece "", TitlePiece "" ]
-        |> List.map
-            (\x ->
-                { icon = iconFromScriptPiece x |> Widget.Icon.elmMaterialIcons Color
-                , text = labelFromScriptPiece x
-                , onPress = Just NextError
-                }
-            )
-
-
-iconFromScriptPiece piece =
-    case piece of
-        UnsurePiece _ ->
-            Material.Icons.dangerous
-
-        CharacterPiece _ ->
-            Material.Icons.face
-
-        LinePiece _ ->
-            Material.Icons.receipt
-
-        IgnorePiece _ ->
-            Material.Icons.border_clear
-
-        StageDirectionPiece _ ->
-            Material.Icons.directions
-
-        TitlePiece _ ->
-            Material.Icons.grading
-
-
-labelFromScriptPiece piece =
-    case piece of
-        UnsurePiece _ ->
-            "Unsure"
-
-        CharacterPiece _ ->
-            "Character"
-
-        LinePiece _ ->
-            "Line"
-
-        IgnorePiece _ ->
-            "Ignore"
-
-        StageDirectionPiece _ ->
-            "Stage Direction"
-
-        TitlePiece _ ->
-            "Title"
-
-
-buttonWrapper leftButtons rightButtons =
-    Widget.buttonBar (Material.buttonBar leftButtons palette) (barConfig rightButtons)
-
-
-barConfig actions =
-    { deviceClass = Desktop
-    , openLeftSheet = Nothing
-    , openRightSheet = Nothing
-    , openTopSheet = Nothing
-    , primaryActions = actions
-    , search = Nothing
-    , title = Element.text "Hello"
-    }
 
 
 scriptEditor : Model -> Element Msg
@@ -335,9 +266,9 @@ scriptPieceView selectedPieceIndex labelIndex index scriptPiece =
                    )
 
         iconHelper =
-            Element.el
-                mouseOverHelper
-                (iconWrapper (iconFromScriptPiece scriptPiece))
+            Element.el mouseOverHelper <|
+                Widget.Icon.elmMaterialIcons Color (iconFromScriptPiece scriptPiece) <|
+                    { size = 20, color = colorFromScriptPiece scriptPiece }
 
         viewHelper scriptLine =
             Element.row style
@@ -367,5 +298,109 @@ scriptPieceView selectedPieceIndex labelIndex index scriptPiece =
             viewHelper t
 
 
-iconWrapper icon =
-    Widget.Icon.elmMaterialIcons Color icon { size = 20, color = palette.error }
+
+--  _   _      _                                       _
+-- | | | | ___| |_ __   ___ _ __ ___    __ _ _ __   __| |
+-- | |_| |/ _ \ | '_ \ / _ \ '__/ __|  / _` | '_ \ / _` |
+-- |  _  |  __/ | |_) |  __/ |  \__ \ | (_| | | | | (_| |
+-- |_| |_|\___|_| .__/ \___|_|  |___/  \__,_|_| |_|\__,_|
+--              |_|
+--  _   _ _   _ _ _ _   _
+-- | | | | |_(_) (_) |_(_) ___  ___
+-- | | | | __| | | | __| |/ _ \/ __|
+-- | |_| | |_| | | | |_| |  __/\__ \
+--  \___/ \__|_|_|_|\__|_|\___||___/
+--
+
+
+palette =
+    { defaultPalette | primary = Color.black }
+
+
+scriptPieceButtons =
+    [ UnsurePiece "", CharacterPiece "", LinePiece "", IgnorePiece "", StageDirectionPiece "", TitlePiece "" ]
+        |> List.map
+            (\x ->
+                { icon = iconFromScriptPiece x |> Widget.Icon.elmMaterialIcons Color
+                , text = labelFromScriptPiece x
+                , onPress = Just NextError
+                }
+            )
+
+
+iconFromScriptPiece piece =
+    case piece of
+        UnsurePiece _ ->
+            Material.Icons.dangerous
+
+        CharacterPiece _ ->
+            Material.Icons.face
+
+        LinePiece _ ->
+            Material.Icons.receipt
+
+        IgnorePiece _ ->
+            Material.Icons.border_clear
+
+        StageDirectionPiece _ ->
+            Material.Icons.directions
+
+        TitlePiece _ ->
+            Material.Icons.grading
+
+
+labelFromScriptPiece piece =
+    case piece of
+        UnsurePiece _ ->
+            "Unsure"
+
+        CharacterPiece _ ->
+            "Character"
+
+        LinePiece _ ->
+            "Line"
+
+        IgnorePiece _ ->
+            "Ignore"
+
+        StageDirectionPiece _ ->
+            "Stage Direction"
+
+        TitlePiece _ ->
+            "Title"
+
+
+colorFromScriptPiece piece =
+    case piece of
+        UnsurePiece _ ->
+            palette.error
+
+        CharacterPiece _ ->
+            palette.error
+
+        LinePiece _ ->
+            palette.error
+
+        IgnorePiece _ ->
+            palette.on.error
+
+        StageDirectionPiece _ ->
+            palette.error
+
+        TitlePiece _ ->
+            palette.error
+
+
+buttonWrapper leftButtons rightButtons =
+    Widget.buttonBar (Material.buttonBar leftButtons palette) (barConfig rightButtons)
+
+
+barConfig actions =
+    { deviceClass = Desktop
+    , openLeftSheet = Nothing
+    , openRightSheet = Nothing
+    , openTopSheet = Nothing
+    , primaryActions = actions
+    , search = Nothing
+    , title = Element.text "Hello"
+    }
