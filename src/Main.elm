@@ -443,7 +443,7 @@ palette =
 
 allScriptPieceKinds : List ScriptPieceKind
 allScriptPieceKinds =
-    [ UnsurePiece, CharacterPiece, LinePiece, IgnorePiece, StageDirectionPiece, TitlePiece ]
+    [ CharacterPiece, LinePiece, StageDirectionPiece, TitlePiece, IgnorePiece, UnsurePiece ]
 
 
 scriptPieceButtons =
