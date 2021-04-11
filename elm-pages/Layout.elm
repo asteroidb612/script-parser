@@ -88,9 +88,7 @@ highlightableLink currentPath linkDirectory displayName =
     in
     Element.link
         (if isHighlighted then
-            [ Font.underline
-            , Font.color Palette.color.primary
-            ]
+            [ Font.underline ]
 
          else
             []

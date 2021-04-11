@@ -1,23 +1,8 @@
-port module Storage exposing (loadPlainScript, storePlainScript, storeScriptPieces)
+port module Storage exposing (decodeScriptPieces, loadScriptPieces, storeScriptPieces)
 
 import Json.Decode as D
 import Json.Encode exposing (..)
 import ScriptExport exposing (ScriptPiece(..), ScriptPieceKind(..))
-
-
-
---  ____  _       _         ____            _       _
--- |  _ \| | __ _(_)_ __   / ___|  ___ _ __(_)_ __ | |_ ___
--- | |_) | |/ _` | | '_ \  \___ \ / __| '__| | '_ \| __/ __|
--- |  __/| | (_| | | | | |  ___) | (__| |  | | |_) | |_\__ \
--- |_|   |_|\__,_|_|_| |_| |____/ \___|_|  |_| .__/ \__|___/
---                                           |_|
-
-
-port loadPlainScript : (String -> msg) -> Sub msg
-
-
-port storePlainScript : String -> Cmd msg
 
 
 

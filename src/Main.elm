@@ -8,6 +8,7 @@ import Element.Events
 import Element.Font
 import Element.Input
 import ElmPages exposing (canonicalSiteUrl, generateFiles, manifest, markdownDocument, view)
+import Json.Decode as D
 import List.Extra
 import Macbeth exposing (scene1)
 import Material.Icons exposing (offline_bolt)
@@ -16,7 +17,7 @@ import Metadata exposing (Metadata)
 import Pages exposing (images, pages)
 import Pages.Platform
 import ScriptExport exposing (ScriptPiece(..), ScriptPieceKind(..), cueCannonUrl, parseScript, scriptPiecesFromPlainScript)
-import Storage exposing (loadPlainScript, storePlainScript, storeScriptPieces)
+import Storage exposing (decodeScriptPieces, loadScriptPieces, storeScriptPieces)
 import Widget
 import Widget.Icon exposing (Icon)
 import Widget.Material as Material exposing (defaultPalette)
@@ -56,12 +57,14 @@ type alias Rendered =
     Element Msg
 
 
-type
-    Msg
-    -- Script actions
-    = ChangeScript String
+type Msg
+    = NoOp
+      -- Script actions
+    | ChangeScript String
     | Export String
     | ChangeScriptPiece ScriptPieceKind
+    | LoadedScriptPieces (List ScriptPiece)
+    | ReplaceScriptPiecesWithLoaded
       -- View actions
     | SelectPiece Int
     | NextError
@@ -73,6 +76,7 @@ type alias Model =
     -- Script data
     { plainScript : String
     , scriptPieces : List ScriptPiece
+    , loadedScriptPieces : List ScriptPiece
 
     -- View data
     , selectedPiece : Maybe Int
@@ -84,6 +88,7 @@ init : ( Model, Cmd Msg )
 init =
     ( { plainScript = scene1
       , scriptPieces = scriptPiecesFromPlainScript scene1
+      , loadedScriptPieces = []
       , selectedPiece = Nothing
       , labelMouseOver = Nothing
       }
@@ -105,10 +110,7 @@ update msg model =
                     scriptPiecesFromPlainScript s
             in
             ( { model | plainScript = s, scriptPieces = newScriptPieces }
-            , Cmd.batch
-                [ storePlainScript s
-                , storeScriptPieces newScriptPieces
-                ]
+            , storeScriptPieces newScriptPieces
             )
 
         ChangeScriptPiece newKind ->
@@ -126,6 +128,12 @@ update msg model =
 
                 Nothing ->
                     ( model, Cmd.none )
+
+        LoadedScriptPieces pieces ->
+            ( { model | loadedScriptPieces = pieces }, Cmd.none )
+
+        ReplaceScriptPiecesWithLoaded ->
+            ( { model | scriptPieces = model.loadedScriptPieces }, Cmd.none )
 
         -- UI Changes
         LabelMouseEnter i ->
@@ -149,10 +157,21 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
+        NoOp ->
+            ( model, Cmd.none )
+
 
 subscriptions : Metadata -> pages -> Model -> Sub Msg
 subscriptions _ _ _ =
-    loadPlainScript ChangeScript
+    loadScriptPieces
+        (\value ->
+            case D.decodeValue decodeScriptPieces value of
+                Ok pieces ->
+                    LoadedScriptPieces pieces
+
+                Err _ ->
+                    NoOp
+        )
 
 
 
@@ -169,17 +188,11 @@ scriptParseApp : Model -> { title : String, body : List (Element Msg) }
 scriptParseApp model =
     { title = "CueCannon - Script Parser"
     , body =
-        [ Element.column [ Element.width Element.fill ]
+        [ Element.column [ Element.width Element.fill ] <|
             [ topBar model
             , Element.row
                 [ Element.width Element.fill ]
-                [ if model.plainScript /= "" then
-                    scriptPiecesView model
-
-                  else
-                    Element.none
-                , scriptEditor model
-                ]
+                [ scriptPiecesView model, loaders model ]
             ]
         ]
     }
@@ -188,35 +201,65 @@ scriptParseApp model =
 topBar : Model -> Element Msg
 topBar model =
     let
+        errorCount =
+            model.scriptPieces
+                |> List.filter (\(ScriptPiece kind _) -> kind == UnsurePiece)
+                |> List.length
+
+        loadButton =
+            { icon =
+                Material.Icons.bug_report
+                    |> Widget.Icon.elmMaterialIcons Color
+            , text = String.fromInt errorCount ++ " errors found: fix before export"
+            , onPress = Just NextError
+            }
+
+        ( exportIcon, exportMsg ) =
+            case parseScript model.scriptPieces of
+                Err _ ->
+                    ( Material.Icons.cancel, Nothing )
+
+                Ok href ->
+                    ( Material.Icons.upgrade, Just (Export (cueCannonUrl href)) )
+
+        exportButton =
+            { icon =
+                exportIcon |> Widget.Icon.elmMaterialIcons Color
+            , text = "Open script in app"
+            , onPress = exportMsg
+            }
+
         ( leftButtons, rightButtons ) =
             case parseScript model.scriptPieces of
                 Err s ->
-                    ( scriptPieceButtons
-                    , [ { icon =
-                            Material.Icons.bug_report
-                                |> Widget.Icon.elmMaterialIcons Color
-                        , text = "Errors found: fix before export"
-                        , onPress = Just NextError
-                        }
-                      ]
-                    )
+                    ( scriptPieceButtons, [ loadButton ] )
 
                 Ok href ->
                     ( []
-                    , [ { icon =
-                            Material.Icons.upgrade
-                                |> Widget.Icon.elmMaterialIcons Color
-                        , text = "Open script in app"
-                        , onPress = Just (Export (cueCannonUrl href))
-                        }
-                      ]
+                    , [ exportButton ]
                     )
     in
-    if model.plainScript == "" then
-        Element.none
+    buttonWrapper [ exportButton ] [ loadButton ]
 
-    else
-        buttonWrapper leftButtons rightButtons
+
+loaders : Model -> Element Msg
+loaders model =
+    Element.column [] <|
+        Element.el [ Element.Font.size 16 ]
+            (Element.text "Load from Copy/Paste")
+            :: scriptEditor model
+            :: (case model.loadedScriptPieces of
+                    [] ->
+                        []
+
+                    _ ->
+                        [ Element.el
+                            [ Element.Font.size 16
+                            , Element.Events.onClick ReplaceScriptPiecesWithLoaded
+                            ]
+                            (Element.text "Load from save")
+                        ]
+               )
 
 
 scriptEditor : Model -> Element Msg
@@ -323,14 +366,14 @@ allScriptPieceKinds =
 
 
 scriptPieceButtons =
-    allScriptPieceKinds
-        |> List.map
-            (\x ->
-                { icon = iconFromScriptPiece x |> Widget.Icon.elmMaterialIcons Color
-                , text = labelFromScriptPiece x
-                , onPress = Just (ChangeScriptPiece x)
-                }
-            )
+    let
+        makeButton kind =
+            { icon = iconFromScriptPiece kind |> Widget.Icon.elmMaterialIcons Color
+            , text = labelFromScriptPiece kind
+            , onPress = Just (ChangeScriptPiece kind)
+            }
+    in
+    List.map makeButton allScriptPieceKinds
 
 
 iconFromScriptPiece kind =
