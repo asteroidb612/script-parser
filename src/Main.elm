@@ -1,5 +1,6 @@
 module Main exposing (main)
 
+import Browser.Dom
 import Browser.Navigation as Nav
 import Color
 import Element exposing (DeviceClass(..), Element)
@@ -8,6 +9,8 @@ import Element.Events
 import Element.Font
 import Element.Input
 import ElmPages exposing (canonicalSiteUrl, generateFiles, manifest, markdownDocument, view)
+import Html.Attributes
+import Html.Events
 import Json.Decode as D
 import List.Extra
 import Macbeth exposing (scene1)
@@ -18,6 +21,7 @@ import Pages exposing (images, pages)
 import Pages.Platform
 import ScriptExport exposing (ScriptPiece(..), ScriptPieceKind(..), cueCannonUrl, parseScript, scriptPiecesFromPlainScript)
 import Storage exposing (decodeScriptPieces, loadScriptPieces, storeScriptPieces)
+import Task
 import Widget
 import Widget.Icon exposing (Icon)
 import Widget.Material as Material exposing (defaultPalette)
@@ -70,6 +74,7 @@ type Msg
     | NextError
     | LabelMouseEnter Int
     | LabelMouseLeave
+    | ShortcutPressed Int
 
 
 type alias Model =
@@ -92,12 +97,45 @@ init =
       , selectedPiece = Nothing
       , labelMouseOver = Nothing
       }
-    , Cmd.none
+    , setShortcutFocus
     )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
+    let
+        selectingNextError : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+        selectingNextError ( m, cmd ) =
+            ( { m
+                | selectedPiece =
+                    List.Extra.findIndex
+                        (\(ScriptPiece kind _) -> kind == UnsurePiece)
+                        m.scriptPieces
+              }
+            , cmd
+            )
+
+        changingSelectedPieceTo : ScriptPieceKind -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+        changingSelectedPieceTo k ( m, cmd ) =
+            let
+                changeScriptPieceType (ScriptPiece _ line) =
+                    ScriptPiece k line
+
+                newScriptPieces =
+                    case m.selectedPiece of
+                        Just i ->
+                            m.scriptPieces
+                                |> List.Extra.updateAt i changeScriptPieceType
+
+                        Nothing ->
+                            m.scriptPieces
+            in
+            ( { m
+                | scriptPieces = newScriptPieces
+              }
+            , Cmd.batch (storeScriptPieces newScriptPieces :: [ cmd ])
+            )
+    in
     case msg of
         -- Editing script and script pieces
         Export href ->
@@ -110,24 +148,14 @@ update msg model =
                     scriptPiecesFromPlainScript s
             in
             ( { model | plainScript = s, scriptPieces = newScriptPieces }
-            , storeScriptPieces newScriptPieces
+            , Cmd.none
+              -- storeScriptPieces newScriptPieces
             )
 
         ChangeScriptPiece newKind ->
-            case model.selectedPiece of
-                Just i ->
-                    let
-                        changeScriptPieceType (ScriptPiece _ line) =
-                            ScriptPiece newKind line
-
-                        newScriptPieces =
-                            model.scriptPieces
-                                |> List.Extra.updateAt i changeScriptPieceType
-                    in
-                    ( { model | scriptPieces = newScriptPieces }, storeScriptPieces newScriptPieces )
-
-                Nothing ->
-                    ( model, Cmd.none )
+            ( model, Cmd.none )
+                |> changingSelectedPieceTo newKind
+                |> selectingNextError
 
         LoadedScriptPieces pieces ->
             ( { model | loadedScriptPieces = pieces }, Cmd.none )
@@ -144,15 +172,46 @@ update msg model =
 
         SelectPiece i ->
             if List.length model.scriptPieces > i && i >= 0 then
-                ( { model | selectedPiece = Just i }, Cmd.none )
+                ( { model | selectedPiece = Just i }, setShortcutFocus )
 
             else
-                ( model, Cmd.none )
+                ( model, setShortcutFocus )
 
         NextError ->
-            case List.Extra.findIndex (\(ScriptPiece kind _) -> kind == UnsurePiece) model.scriptPieces of
-                Just piece ->
-                    ( { model | selectedPiece = Just piece }, Cmd.none )
+            ( model, Cmd.none )
+                |> selectingNextError
+
+        ShortcutPressed i ->
+            case i of
+                85 ->
+                    ( model, Cmd.none )
+                        |> changingSelectedPieceTo UnsurePiece
+                        |> selectingNextError
+
+                67 ->
+                    ( model, Cmd.none )
+                        |> changingSelectedPieceTo CharacterPiece
+                        |> selectingNextError
+
+                76 ->
+                    ( model, Cmd.none )
+                        |> changingSelectedPieceTo LinePiece
+                        |> selectingNextError
+
+                73 ->
+                    ( model, Cmd.none )
+                        |> changingSelectedPieceTo IgnorePiece
+                        |> selectingNextError
+
+                83 ->
+                    ( model, Cmd.none )
+                        |> changingSelectedPieceTo StageDirectionPiece
+                        |> selectingNextError
+
+                84 ->
+                    ( model, Cmd.none )
+                        |> changingSelectedPieceTo TitlePiece
+                        |> selectingNextError
 
                 _ ->
                     ( model, Cmd.none )
@@ -244,9 +303,9 @@ topBar model =
 
 loaders : Model -> Element Msg
 loaders model =
-    Element.column [] <|
+    Element.column [ Element.alignTop, Element.paddingXY 0 20 ] <|
         Element.el [ Element.Font.size 16 ]
-            (Element.text "Load from Copy/Paste")
+            (Element.text "Loaded from Copy/Paste")
             :: scriptEditor model
             :: (case model.loadedScriptPieces of
                     [] ->
@@ -293,18 +352,28 @@ scriptPiecesView : Model -> Element Msg
 scriptPiecesView { scriptPieces, selectedPiece, labelMouseOver } =
     scriptPieces
         |> List.indexedMap (scriptPieceView selectedPiece labelMouseOver)
-        |> Element.textColumn [ Element.spacing 5, Element.padding 20 ]
+        |> Element.textColumn
+            ([ Element.spacing 5
+             , Element.padding 20
+             ]
+                ++ keyboardShortcutListenerAttributes
+            )
 
 
 scriptPieceView : Maybe Int -> Maybe Int -> Int -> ScriptPiece -> Element Msg
 scriptPieceView selectedPieceIndex labelIndex index (ScriptPiece kind line) =
     let
+        isSelected =
+            selectedPieceIndex == Just index
+
+        isHovered =
+            labelIndex == Just index
+
         style =
             Element.spacing 60
                 :: Element.pointer
                 :: Element.mouseOver [ Element.scale 1.01 ]
-                :: Element.Events.onClick (SelectPiece index)
-                :: (if selectedPieceIndex == Just index then
+                :: (if isSelected then
                         Widget.Material.Color.textAndBackground
                             (Widget.Material.Color.fromCIELCH { l = 94, c = 50, h = 83 })
 
@@ -318,7 +387,7 @@ scriptPieceView selectedPieceIndex labelIndex index (ScriptPiece kind line) =
         mouseOverHelper =
             Element.Events.onMouseEnter (LabelMouseEnter index)
                 :: Element.Events.onMouseLeave LabelMouseLeave
-                :: (if labelIndex == Just index then
+                :: (if isHovered then
                         [ Element.onLeft labelHelper ]
 
                     else
@@ -330,12 +399,42 @@ scriptPieceView selectedPieceIndex labelIndex index (ScriptPiece kind line) =
                 Widget.Icon.elmMaterialIcons Color (iconFromScriptPiece kind) <|
                     { size = 20, color = colorFromScriptPiece kind }
 
+        scriptPieceKindSelector =
+            if isSelected then
+                allScriptPieceKinds
+                    |> List.map
+                        (\k ->
+                            let
+                                label =
+                                    labelFromScriptPiece k
+
+                                initial =
+                                    String.slice 0 1 label |> String.toLower
+                            in
+                            Element.el
+                                [ Element.padding 3
+                                , Element.Font.size 14
+                                , Element.Events.onClick (ChangeScriptPiece k)
+                                ]
+                            <|
+                                Element.text (label ++ " (" ++ initial ++ ")")
+                        )
+                    |> Element.paragraph []
+                    |> List.singleton
+
+            else
+                []
+
         viewHelper scriptLine =
             Element.row style
-                [ Element.paragraph [] [ Element.text scriptLine ]
+                [ Element.textColumn []
+                    (Element.paragraph
+                        [ Element.Events.onClick (SelectPiece index)
+                        ]
+                        [ Element.text scriptLine ]
+                        :: scriptPieceKindSelector
+                    )
                 , iconHelper
-
-                -- , Element.text (String.fromInt (index + 1))
                 ]
     in
     viewHelper line
@@ -452,3 +551,19 @@ barConfig actions =
     , search = Nothing
     , title = Element.text "Hello"
     }
+
+
+keyboardShortcutListenerAttributes =
+    -- Must be focusable
+    [ Element.htmlAttribute (Html.Attributes.tabindex 0)
+
+    -- Must track id to set focus
+    , Element.htmlAttribute (Html.Attributes.id "scriptPieces")
+
+    -- Events are on the element
+    , Element.htmlAttribute (Html.Events.on "keydown" (D.map ShortcutPressed Html.Events.keyCode))
+    ]
+
+
+setShortcutFocus =
+    Task.attempt (\_ -> NoOp) (Browser.Dom.focus "scriptPieces")
