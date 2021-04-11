@@ -28,7 +28,7 @@ cueCannonUrl : Script -> String
 cueCannonUrl script =
     let
         baseUrl =
-            "cuecannon.com/direct?script="
+            "https://cuecannon.com/direct?script="
     in
     scriptEncoder script
         |> Json.Encode.encode 0
@@ -152,8 +152,13 @@ parseScriptHelper (ScriptPiece kind piece) state =
                         ++ characterName
                     )
 
-            else
+            else if characterName == piece then
                 Parsed title (lines ++ [ { speaker = characterName, identifier = "", line = lineSoFar } ])
+
+            else
+                AddingLine title
+                    (lines ++ [ { speaker = characterName, identifier = "", line = lineSoFar } ])
+                    { characterName = piece, lineSoFar = "" }
 
         ( LinePiece, StartingParse ) ->
             FailedParse ("Encountered Line Piece without preceding Character Piece: " ++ piece)
@@ -171,11 +176,11 @@ parseScript scriptPieces =
         FailedParse s ->
             Err s
 
-        Parsed title l ->
-            Ok (Script title l)
+        Parsed title lines ->
+            Ok (Script title lines)
 
-        AddingLine _ _ _ ->
-            Err "Parse parseScriptHelper ended unexeptedly on AddingLine"
+        AddingLine title lines { characterName, lineSoFar } ->
+            Ok (Script title (lines ++ [ { speaker = characterName, identifier = "", line = lineSoFar } ]))
 
         StartingParse ->
             Err "No script"
