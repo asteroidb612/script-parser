@@ -265,14 +265,6 @@ topBar model =
                 |> List.filter (\(ScriptPiece kind _) -> kind == UnsurePiece)
                 |> List.length
 
-        loadButton =
-            { icon =
-                Material.Icons.bug_report
-                    |> Widget.Icon.elmMaterialIcons Color
-            , text = String.fromInt errorCount ++ " errors found: fix before export"
-            , onPress = Just NextError
-            }
-
         ( exportIcon, exportMsg ) =
             case parseScript model.scriptPieces of
                 Err _ ->
@@ -287,18 +279,8 @@ topBar model =
             , text = "Open script in app"
             , onPress = exportMsg
             }
-
-        ( leftButtons, rightButtons ) =
-            case parseScript model.scriptPieces of
-                Err s ->
-                    ( scriptPieceButtons, [ loadButton ] )
-
-                Ok href ->
-                    ( []
-                    , [ exportButton ]
-                    )
     in
-    buttonWrapper [ exportButton ] [ loadButton ]
+    buttonWrapper [ exportButton ] []
 
 
 loaders : Model -> Element Msg
@@ -529,10 +511,10 @@ colorFromScriptPiece kind =
             palette.primary
 
         IgnorePiece ->
-            palette.on.error
+            palette.primary
 
         StageDirectionPiece ->
-            palette.on.error
+            palette.primary
 
         TitlePiece ->
             palette.primary
