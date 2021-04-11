@@ -67,8 +67,8 @@ header currentPath =
                         ]
                 }
             , Element.row [ Element.spacing 15 ]
-                [ highlightableLink currentPath Pages.pages.blog.directory "App"
-                , highlightableLink currentPath Pages.pages.blog.directory "Script Editor"
+                [ appLink
+                , highlightableLink currentPath Pages.pages.editor.directory "Script Editor"
                 , highlightableLink currentPath Pages.pages.blog.directory "Blog"
                 , githubRepoLink
                 ]
@@ -110,4 +110,12 @@ githubRepoLink =
                 , Font.color Palette.color.primary
                 ]
                 { src = ImagePath.toString Pages.images.github, description = "Github repo" }
+        }
+
+
+appLink : Element msg
+appLink =
+    Element.newTabLink []
+        { url = "https://cuecannon.com/"
+        , label = Element.text "App"
         }

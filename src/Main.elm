@@ -16,6 +16,7 @@ import Metadata exposing (Metadata)
 import Pages exposing (images, pages)
 import Pages.Platform
 import ScriptExport exposing (ScriptPiece(..), ScriptPieceKind(..), cueCannonUrl, parseScript, scriptPiecesFromPlainScript)
+import Storage exposing (loadPlainScript, storePlainScript, storeScriptPieces)
 import Widget
 import Widget.Icon exposing (Icon)
 import Widget.Material as Material exposing (defaultPalette)
@@ -98,12 +99,16 @@ update msg model =
             ( model, Nav.load href )
 
         ChangeScript s ->
-            -- FIXME overwrites script pieces, implement merge
-            ( { model
-                | plainScript = s
-                , scriptPieces = scriptPiecesFromPlainScript s
-              }
-            , Cmd.none
+            let
+                newScriptPieces =
+                    -- FIXME overwrites script pieces, implement merge
+                    scriptPiecesFromPlainScript s
+            in
+            ( { model | plainScript = s, scriptPieces = newScriptPieces }
+            , Cmd.batch
+                [ storePlainScript s
+                , storeScriptPieces newScriptPieces
+                ]
             )
 
         ChangeScriptPiece newKind ->
@@ -117,7 +122,7 @@ update msg model =
                             model.scriptPieces
                                 |> List.Extra.updateAt i changeScriptPieceType
                     in
-                    ( { model | scriptPieces = newScriptPieces }, Cmd.none )
+                    ( { model | scriptPieces = newScriptPieces }, storeScriptPieces newScriptPieces )
 
                 Nothing ->
                     ( model, Cmd.none )
@@ -145,9 +150,9 @@ update msg model =
                     ( model, Cmd.none )
 
 
-subscriptions : Metadata -> pages -> Model -> Sub msg
+subscriptions : Metadata -> pages -> Model -> Sub Msg
 subscriptions _ _ _ =
-    Sub.none
+    loadPlainScript ChangeScript
 
 
 
@@ -184,7 +189,7 @@ topBar : Model -> Element Msg
 topBar model =
     let
         ( leftButtons, rightButtons ) =
-            case Debug.log "" (parseScript model.scriptPieces) of
+            case parseScript model.scriptPieces of
                 Err s ->
                     ( scriptPieceButtons
                     , [ { icon =
@@ -207,7 +212,11 @@ topBar model =
                       ]
                     )
     in
-    buttonWrapper leftButtons rightButtons
+    if model.plainScript == "" then
+        Element.none
+
+    else
+        buttonWrapper leftButtons rightButtons
 
 
 scriptEditor : Model -> Element Msg
