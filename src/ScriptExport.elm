@@ -28,7 +28,8 @@ cueCannonUrl : Script -> String
 cueCannonUrl script =
     let
         baseUrl =
-            "https://cuecannon.com/direct?script="
+            --"http://localhost:8080/direct?script="
+            "https://goofy-mccarthy-23ec73.netlify.app/direct?script="
     in
     scriptEncoder script
         |> Json.Encode.encode 0
