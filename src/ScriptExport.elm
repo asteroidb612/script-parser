@@ -28,8 +28,8 @@ cueCannonUrl : Script -> String
 cueCannonUrl script =
     let
         baseUrl =
-            --"http://localhost:8080/direct?script="
-            "https://goofy-mccarthy-23ec73.netlify.app/direct?script="
+            --"http://localhost:8080?script="
+            "https://goofy-mccarthy-23ec73.netlify.app?script="
     in
     scriptEncoder script
         |> Json.Encode.encode 0
@@ -135,8 +135,8 @@ parseScriptHelper (ScriptPiece kind piece) state =
                     ++ oldTitle
                 )
 
-        ( TitlePiece, AddingLine _ _ _ ) ->
-            FailedParse "Encountered"
+        ( TitlePiece, AddingLine _ _ { lineSoFar } ) ->
+            FailedParse ("Encountered TitlePiece while adding lines near " ++ lineSoFar)
 
         ( CharacterPiece, StartingParse ) ->
             AddingLine startingTitle [] { characterName = piece, lineSoFar = "" }

@@ -9,6 +9,7 @@ import Element.Events
 import Element.Font
 import Element.Input
 import ElmPages exposing (canonicalSiteUrl, generateFiles, manifest, markdownDocument, view)
+import Html
 import Html.Attributes
 import Html.Events
 import Json.Decode as D
@@ -75,6 +76,8 @@ type Msg
     | LabelMouseEnter Int
     | LabelMouseLeave
     | ShortcutPressed Int
+    | UpdateViewport Browser.Dom.Viewport
+    | ToggleShowCopyPaste
 
 
 type alias Model =
@@ -86,6 +89,8 @@ type alias Model =
     -- View data
     , selectedPiece : Maybe Int
     , labelMouseOver : Maybe Int
+    , mainViewport : Maybe Browser.Dom.Viewport
+    , showCopyPaste : Bool
     }
 
 
@@ -96,8 +101,10 @@ init =
       , loadedScriptPieces = []
       , selectedPiece = Nothing
       , labelMouseOver = Nothing
+      , mainViewport = Nothing
+      , showCopyPaste = True
       }
-    , setShortcutFocus
+    , Cmd.batch [ setShortcutFocus, getMainHeight ]
     )
 
 
@@ -148,7 +155,7 @@ update msg model =
                     scriptPiecesFromPlainScript s
             in
             ( { model | plainScript = s, scriptPieces = newScriptPieces }
-            , Cmd.none
+            , getMainHeight
               -- storeScriptPieces newScriptPieces
             )
 
@@ -216,6 +223,12 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
+        UpdateViewport v ->
+            ( { model | mainViewport = Just v }, Cmd.none )
+
+        ToggleShowCopyPaste ->
+            ( { model | showCopyPaste = not model.showCopyPaste }, Cmd.none )
+
         NoOp ->
             ( model, Cmd.none )
 
@@ -250,8 +263,13 @@ scriptParseApp model =
         [ Element.column [ Element.width Element.fill ] <|
             [ topBar model
             , Element.row
-                [ Element.width Element.fill ]
-                [ scriptPiecesView model, loaders model ]
+                [ Element.width Element.fill, Element.htmlAttribute (Html.Attributes.id "main") ]
+                [ if model.showCopyPaste then
+                    scriptPiecesView model
+
+                  else
+                    loaders model
+                ]
             ]
         ]
     }
@@ -265,30 +283,34 @@ topBar model =
                 |> List.filter (\(ScriptPiece kind _) -> kind == UnsurePiece)
                 |> List.length
 
-        ( exportIcon, exportMsg ) =
+        ( exportIcon, exportMsg, errorMsg ) =
             case parseScript model.scriptPieces of
-                Err _ ->
-                    ( Material.Icons.cancel, Nothing )
+                Err s ->
+                    ( Material.Icons.cancel, Nothing, "     (Error - " ++ s ++ ")" )
 
                 Ok href ->
-                    ( Material.Icons.upgrade, Just (Export (cueCannonUrl href)) )
+                    ( Material.Icons.upgrade, Just (Export (cueCannonUrl href)), "" )
 
         exportButton =
             { icon =
                 exportIcon |> Widget.Icon.elmMaterialIcons Color
-            , text = "Open script in app"
+            , text = "Open script in app" ++ errorMsg
             , onPress = exportMsg
             }
     in
-    buttonWrapper [ exportButton ] []
+    buttonWrapper [ exportButton ]
+        [ { icon = exportIcon |> Widget.Icon.elmMaterialIcons Color
+          , text = "Show Copy Paste"
+          , onPress = Just ToggleShowCopyPaste
+          }
+        ]
 
 
 loaders : Model -> Element Msg
 loaders model =
-    Element.column [ Element.alignTop, Element.paddingXY 0 20 ] <|
-        Element.el [ Element.Font.size 16 ]
-            (Element.text "Loaded from Copy/Paste")
-            :: scriptEditor model
+    Element.column [ Element.alignTop ] <|
+        Element.el []
+            (scriptEditor model)
             :: (case model.loadedScriptPieces of
                     [] ->
                         []
@@ -305,38 +327,41 @@ loaders model =
 
 scriptEditor : Model -> Element Msg
 scriptEditor { plainScript } =
-    let
-        ( fontSize, width ) =
-            if plainScript /= "" then
-                ( 12, Element.px 350 )
-
-            else
-                ( 18, Element.fill )
-    in
-    Element.el
-        [ Element.width width
+    Element.Input.multiline
+        [ Element.width (Element.px 760)
         , Element.alignRight
         , Element.alignTop
-        , Element.Font.size fontSize
-        , Element.paddingXY 10 0
+        , Element.Font.size 20
+        , Element.spacing 6
+        , Element.padding 11
         ]
-    <|
-        Element.Input.multiline []
-            { onChange = ChangeScript
-            , text = plainScript
-            , placeholder = Just (Element.Input.placeholder [] (Element.text "Paste a script here to parse into cues!"))
-            , label = Element.Input.labelAbove [] <| Element.text ""
-            , spellcheck = False
-            }
+        { onChange = ChangeScript
+        , text = plainScript
+        , placeholder = Just (Element.Input.placeholder [] (Element.text "Paste a script here to parse into cues!"))
+        , label = Element.Input.labelAbove [] <| Element.text ""
+        , spellcheck = False
+        }
 
 
 scriptPiecesView : Model -> Element Msg
-scriptPiecesView { scriptPieces, selectedPiece, labelMouseOver } =
+scriptPiecesView { scriptPieces, selectedPiece, labelMouseOver, mainViewport } =
+    let
+        height =
+            case mainViewport of
+                Nothing ->
+                    800
+
+                Just v ->
+                    round v.scene.height
+    in
     scriptPieces
         |> List.indexedMap (scriptPieceView selectedPiece labelMouseOver)
         |> Element.textColumn
             ([ Element.spacing 5
              , Element.padding 20
+             , Element.height (Element.px height)
+             , Element.scrollbarY
+             , Element.alignTop
              ]
                 ++ keyboardShortcutListenerAttributes
             )
@@ -413,7 +438,7 @@ scriptPieceView selectedPieceIndex labelIndex index (ScriptPiece kind line) =
                     (Element.paragraph
                         [ Element.Events.onClick (SelectPiece index)
                         ]
-                        [ Element.text scriptLine ]
+                        [ whitespacePreservedText scriptLine ]
                         :: scriptPieceKindSelector
                     )
                 , iconHelper
@@ -549,3 +574,20 @@ keyboardShortcutListenerAttributes =
 
 setShortcutFocus =
     Task.attempt (\_ -> NoOp) (Browser.Dom.focus "scriptPieces")
+
+
+getMainHeight =
+    Task.attempt
+        (\result ->
+            case result of
+                Ok viewPort ->
+                    UpdateViewport viewPort
+
+                Err _ ->
+                    Debug.todo "Failed to find node with id='main' in DOM"
+        )
+        (Browser.Dom.getViewportOf "main")
+
+
+whitespacePreservedText t =
+    Element.html (Html.span [ Html.Attributes.style "white-space" "pre" ] [ Html.text t ])
