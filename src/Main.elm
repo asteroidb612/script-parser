@@ -77,9 +77,16 @@ type Msg
     | ShortcutPressed Int
 
 
+type EditingProgress
+    = AddingScript String
+    | EditingScript (List ScriptPiece)
+    | DoneEditingScript (List ScriptPiece) String
+
+
 type alias Model =
     -- Script data
     { plainScript : String
+    , editingProgress : EditingProgress
     , scriptPieces : List ScriptPiece
     , loadedScriptPieces : List ScriptPiece
 
@@ -92,6 +99,7 @@ type alias Model =
 init : ( Model, Cmd Msg )
 init =
     ( { plainScript = scene1
+      , editingProgress = AddingScript ""
       , scriptPieces = scriptPiecesFromPlainScript scene1
       , loadedScriptPieces = []
       , selectedPiece = Nothing
@@ -249,9 +257,15 @@ scriptParseApp model =
     , body =
         [ Element.column [ Element.width Element.fill ] <|
             [ topBar model
-            , Element.row
-                [ Element.width Element.fill ]
-                [ scriptPiecesView model, loaders model ]
+            , case model.editingProgress of
+                AddingScript _ ->
+                    loaders model
+
+                EditingScript _ ->
+                    scriptPiecesView model
+
+                DoneEditingScript _ _ ->
+                    scriptPiecesView model
             ]
         ]
     }
@@ -285,33 +299,32 @@ topBar model =
 
 loaders : Model -> Element Msg
 loaders model =
-    Element.column [ Element.alignTop, Element.paddingXY 0 20 ] <|
-        Element.el [ Element.Font.size 16 ]
-            (Element.text "Loaded from Copy/Paste")
-            :: scriptEditor model
-            :: (case model.loadedScriptPieces of
-                    [] ->
-                        []
+    let
+        copyPasteLabel =
+            Element.el [ Element.Font.size 16 ] (Element.text "Loaded from Copy/Paste")
 
-                    _ ->
-                        [ Element.el
-                            [ Element.Font.size 16
-                            , Element.Events.onClick ReplaceScriptPiecesWithLoaded
-                            ]
-                            (Element.text "Load from save")
-                        ]
-               )
+        localStorageLabel =
+            Element.el [ Element.Font.size 16, Element.Events.onClick ReplaceScriptPiecesWithLoaded ]
+                (Element.text "Loaded from localStorage")
+
+        localStorageLoader =
+            case model.loadedScriptPieces of
+                [] ->
+                    Element.text "No script save found"
+
+                _ ->
+                    Element.text "Load from save"
+    in
+    Element.column
+        [ Element.alignTop, Element.paddingXY 0 20, Element.width Element.fill ]
+        [ localStorageLabel, localStorageLoader, copyPasteLabel, copyPasteLoader model ]
 
 
-scriptEditor : Model -> Element Msg
-scriptEditor { plainScript } =
+copyPasteLoader : Model -> Element Msg
+copyPasteLoader { plainScript } =
     let
         ( fontSize, width ) =
-            if plainScript /= "" then
-                ( 12, Element.px 350 )
-
-            else
-                ( 18, Element.fill )
+            ( 18, Element.fill )
     in
     Element.el
         [ Element.width width
