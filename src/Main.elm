@@ -85,9 +85,7 @@ type EditingProgress
 
 type alias Model =
     -- Script data
-    { plainScript : String
-    , editingProgress : EditingProgress
-    , scriptPieces : List ScriptPiece
+    { editingProgress : EditingProgress
     , loadedScriptPieces : List ScriptPiece
 
     -- View data
@@ -98,9 +96,7 @@ type alias Model =
 
 init : ( Model, Cmd Msg )
 init =
-    ( { plainScript = scene1
-      , editingProgress = AddingScript ""
-      , scriptPieces = scriptPiecesFromPlainScript scene1
+    ( { editingProgress = AddingScript ""
       , loadedScriptPieces = []
       , selectedPiece = Nothing
       , labelMouseOver = Nothing
@@ -114,35 +110,45 @@ update msg model =
     let
         selectingNextError : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
         selectingNextError ( m, cmd ) =
-            ( { m
-                | selectedPiece =
-                    List.Extra.findIndex
-                        (\(ScriptPiece kind _) -> kind == UnsurePiece)
-                        m.scriptPieces
-              }
-            , cmd
-            )
+            case m.editingProgress of
+                EditingScript scriptPieces ->
+                    ( { m
+                        | selectedPiece =
+                            List.Extra.findIndex
+                                (\(ScriptPiece kind _) -> kind == UnsurePiece)
+                                scriptPieces
+                      }
+                    , cmd
+                    )
+
+                _ ->
+                    ( m, cmd )
 
         changingSelectedPieceTo : ScriptPieceKind -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
         changingSelectedPieceTo k ( m, cmd ) =
-            let
-                changeScriptPieceType (ScriptPiece _ line) =
-                    ScriptPiece k line
+            case m.editingProgress of
+                EditingScript scriptPieces ->
+                    let
+                        changeScriptPieceType (ScriptPiece _ line) =
+                            ScriptPiece k line
 
-                newScriptPieces =
-                    case m.selectedPiece of
-                        Just i ->
-                            m.scriptPieces
-                                |> List.Extra.updateAt i changeScriptPieceType
+                        newScriptPieces =
+                            case m.selectedPiece of
+                                Just i ->
+                                    scriptPieces
+                                        |> List.Extra.updateAt i changeScriptPieceType
 
-                        Nothing ->
-                            m.scriptPieces
-            in
-            ( { m
-                | scriptPieces = newScriptPieces
-              }
-            , Cmd.batch (storeScriptPieces newScriptPieces :: [ cmd ])
-            )
+                                Nothing ->
+                                    scriptPieces
+                    in
+                    ( { m
+                        | editingProgress = EditingScript newScriptPieces
+                      }
+                    , Cmd.batch (storeScriptPieces newScriptPieces :: [ cmd ])
+                    )
+
+                _ ->
+                    ( m, cmd )
     in
     case msg of
         -- Editing script and script pieces
@@ -150,15 +156,7 @@ update msg model =
             ( model, Nav.load href )
 
         ChangeScript s ->
-            let
-                newScriptPieces =
-                    -- FIXME overwrites script pieces, implement merge
-                    scriptPiecesFromPlainScript s
-            in
-            ( { model | plainScript = s, scriptPieces = newScriptPieces }
-            , Cmd.none
-              -- storeScriptPieces newScriptPieces
-            )
+            ( { model | editingProgress = AddingScript s }, Cmd.none )
 
         ChangeScriptPiece newKind ->
             ( model, Cmd.none )
@@ -169,7 +167,7 @@ update msg model =
             ( { model | loadedScriptPieces = pieces }, Cmd.none )
 
         ReplaceScriptPiecesWithLoaded ->
-            ( { model | scriptPieces = model.loadedScriptPieces }, Cmd.none )
+            ( { model | editingProgress = EditingScript model.loadedScriptPieces }, Cmd.none )
 
         -- UI Changes
         LabelMouseEnter i ->
@@ -179,11 +177,16 @@ update msg model =
             ( { model | labelMouseOver = Nothing }, Cmd.none )
 
         SelectPiece i ->
-            if List.length model.scriptPieces > i && i >= 0 then
-                ( { model | selectedPiece = Just i }, setShortcutFocus )
+            case model.editingProgress of
+                EditingScript scriptPieces ->
+                    if List.length scriptPieces > i && i >= 0 then
+                        ( { model | selectedPiece = Just i }, setShortcutFocus )
 
-            else
-                ( model, setShortcutFocus )
+                    else
+                        ( model, setShortcutFocus )
+
+                _ ->
+                    ( model, setShortcutFocus )
 
         NextError ->
             ( model, Cmd.none )
@@ -256,31 +259,39 @@ scriptParseApp model =
     { title = "CueCannon - Script Parser"
     , body =
         [ Element.column [ Element.width Element.fill ] <|
-            [ topBar model
-            , case model.editingProgress of
-                AddingScript _ ->
-                    loaders model
+            case model.editingProgress of
+                AddingScript plainScript ->
+                    [ topBar [], loaders plainScript model.loadedScriptPieces ]
 
-                EditingScript _ ->
-                    scriptPiecesView model
+                EditingScript scriptPieces ->
+                    [ topBar scriptPieces
+                    , scriptPieces
+                        |> List.indexedMap (scriptPieceView model.selectedPiece model.labelMouseOver)
+                        |> Element.textColumn
+                            ([ Element.spacing 5, Element.padding 20 ] ++ keyboardShortcutListenerAttributes)
+                    ]
 
-                DoneEditingScript _ _ ->
-                    scriptPiecesView model
-            ]
+                DoneEditingScript scriptPieces _ ->
+                    [ topBar scriptPieces
+                    , scriptPieces
+                        |> List.indexedMap (scriptPieceView model.selectedPiece model.labelMouseOver)
+                        |> Element.textColumn
+                            ([ Element.spacing 5, Element.padding 20 ] ++ keyboardShortcutListenerAttributes)
+                    ]
         ]
     }
 
 
-topBar : Model -> Element Msg
-topBar model =
+topBar : List ScriptPiece -> Element Msg
+topBar scriptPieces =
     let
         errorCount =
-            model.scriptPieces
+            scriptPieces
                 |> List.filter (\(ScriptPiece kind _) -> kind == UnsurePiece)
                 |> List.length
 
         ( exportIcon, exportMsg ) =
-            case parseScript model.scriptPieces of
+            case parseScript scriptPieces of
                 Err _ ->
                     ( Material.Icons.cancel, Nothing )
 
@@ -293,12 +304,36 @@ topBar model =
             , text = "Open script in app"
             , onPress = exportMsg
             }
+
+        firstButton =
+            { icon = Material.Icons.book |> Widget.Icon.elmMaterialIcons Color
+            , text = "Select script"
+            , onPress = Just NoOp
+            }
+
+        secondButton =
+            { icon = Material.Icons.edit |> Widget.Icon.elmMaterialIcons Color
+            , text = "Split script into cues"
+            , onPress = Just NoOp
+            }
+
+        arrow =
+            { icon = Material.Icons.arrow_right |> Widget.Icon.elmMaterialIcons Color
+            , text = ""
+            , onPress = Nothing
+            }
+
+        title =
+            { icon = Material.Icons.question_answer |> Widget.Icon.elmMaterialIcons Color
+            , text = "Cue maker"
+            , onPress = Just NoOp
+            }
     in
-    buttonWrapper [ exportButton ] []
+    buttonWrapper [ title ] [ firstButton, arrow, secondButton, arrow, exportButton ]
 
 
-loaders : Model -> Element Msg
-loaders model =
+loaders : String -> List ScriptPiece -> Element Msg
+loaders plainScript loadedScriptPieces =
     let
         copyPasteLabel =
             Element.el [ Element.Font.size 16 ] (Element.text "Loaded from Copy/Paste")
@@ -308,7 +343,7 @@ loaders model =
                 (Element.text "Loaded from localStorage")
 
         localStorageLoader =
-            case model.loadedScriptPieces of
+            case loadedScriptPieces of
                 [] ->
                     Element.text "No script save found"
 
@@ -317,11 +352,11 @@ loaders model =
     in
     Element.column
         [ Element.alignTop, Element.paddingXY 0 20, Element.width Element.fill ]
-        [ localStorageLabel, localStorageLoader, copyPasteLabel, copyPasteLoader model ]
+        [ localStorageLabel, localStorageLoader, copyPasteLabel, copyPasteLoader plainScript ]
 
 
-copyPasteLoader : Model -> Element Msg
-copyPasteLoader { plainScript } =
+copyPasteLoader : String -> Element Msg
+copyPasteLoader plainScript =
     let
         ( fontSize, width ) =
             ( 18, Element.fill )
@@ -341,18 +376,6 @@ copyPasteLoader { plainScript } =
             , label = Element.Input.labelAbove [] <| Element.text ""
             , spellcheck = False
             }
-
-
-scriptPiecesView : Model -> Element Msg
-scriptPiecesView { scriptPieces, selectedPiece, labelMouseOver } =
-    scriptPieces
-        |> List.indexedMap (scriptPieceView selectedPiece labelMouseOver)
-        |> Element.textColumn
-            ([ Element.spacing 5
-             , Element.padding 20
-             ]
-                ++ keyboardShortcutListenerAttributes
-            )
 
 
 scriptPieceView : Maybe Int -> Maybe Int -> Int -> ScriptPiece -> Element Msg
@@ -544,7 +567,7 @@ barConfig actions =
     , openTopSheet = Nothing
     , primaryActions = actions
     , search = Nothing
-    , title = Element.text "Hello"
+    , title = Element.text "Cue maker"
     }
 
 
