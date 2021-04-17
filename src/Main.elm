@@ -322,14 +322,8 @@ topBar scriptPieces =
             , text = ""
             , onPress = Nothing
             }
-
-        title =
-            { icon = Material.Icons.question_answer |> Widget.Icon.elmMaterialIcons Color
-            , text = "Cue maker"
-            , onPress = Just NoOp
-            }
     in
-    buttonWrapper [ title ] [ firstButton, arrow, secondButton, arrow, exportButton ]
+    buttonWrapper [] [ firstButton, arrow, secondButton, arrow, exportButton ]
 
 
 loaders : String -> List ScriptPiece -> Element Msg
@@ -567,7 +561,12 @@ barConfig actions =
     , openTopSheet = Nothing
     , primaryActions = actions
     , search = Nothing
-    , title = Element.text "Cue maker"
+    , title =
+        Element.row [ Element.padding 8, Element.spacing 4 ]
+            [ Widget.Icon.elmMaterialIcons Color Material.Icons.question_answer <|
+                { size = 20, color = palette.on.primary }
+            , Element.text "Cue Maker"
+            ]
     }
 
 
