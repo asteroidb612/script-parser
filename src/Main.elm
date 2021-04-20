@@ -329,24 +329,39 @@ topBar scriptPieces =
 loaders : String -> List ScriptPiece -> Element Msg
 loaders plainScript loadedScriptPieces =
     let
+        exampleLabel =
+            Element.el [ Element.Font.size 20 ] (Element.text "Load an example")
+
+        exampleLoader =
+            Element.row [ Element.paddingXY 20 0 ] [ Widget.textButton (Material.textButton palette) { onPress = Nothing, text = "Macbeth" } ]
+
         copyPasteLabel =
-            Element.el [ Element.Font.size 16 ] (Element.text "Loaded from Copy/Paste")
+            Element.el [ Element.Font.size 20 ] (Element.text "Load from copy/paste")
 
         localStorageLabel =
-            Element.el [ Element.Font.size 16, Element.Events.onClick ReplaceScriptPiecesWithLoaded ]
-                (Element.text "Loaded from localStorage")
+            Element.el [ Element.Font.size 20 ] (Element.text "Load saved script")
 
         localStorageLoader =
-            case loadedScriptPieces of
-                [] ->
-                    Element.text "No script save found"
+            Element.el [ Element.paddingXY 20 0 ] <|
+                case loadedScriptPieces of
+                    [] ->
+                        Widget.textButton (Material.textButton palette) { onPress = Nothing, text = "No saved script found" }
 
-                _ ->
-                    Element.text "Load from save"
+                    _ ->
+                        Widget.textButton (Material.textButton palette)
+                            { onPress = Just ReplaceScriptPiecesWithLoaded
+                            , text = "Load"
+                            }
     in
     Element.column
-        [ Element.alignTop, Element.paddingXY 0 20, Element.width Element.fill ]
-        [ localStorageLabel, localStorageLoader, copyPasteLabel, copyPasteLoader plainScript ]
+        [ Element.alignTop, Element.padding 50, Element.spacing 20, Element.width Element.fill ]
+        [ exampleLabel
+        , exampleLoader
+        , localStorageLabel
+        , localStorageLoader
+        , copyPasteLabel
+        , copyPasteLoader plainScript
+        ]
 
 
 copyPasteLoader : String -> Element Msg
@@ -360,13 +375,13 @@ copyPasteLoader plainScript =
         , Element.alignRight
         , Element.alignTop
         , Element.Font.size fontSize
-        , Element.paddingXY 10 0
+        , Element.paddingXY 20 0
         ]
     <|
         Element.Input.multiline []
             { onChange = ChangeScript
             , text = plainScript
-            , placeholder = Just (Element.Input.placeholder [] (Element.text "Paste a script here to parse into cues!"))
+            , placeholder = Just (Element.Input.placeholder [] (Element.text "Paste here!"))
             , label = Element.Input.labelAbove [] <| Element.text ""
             , spellcheck = False
             }
