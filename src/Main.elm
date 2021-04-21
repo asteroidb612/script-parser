@@ -5,6 +5,7 @@ import Browser.Navigation as Nav
 import Color
 import Element exposing (DeviceClass(..), Element)
 import Element.Background
+import Element.Border
 import Element.Events
 import Element.Font
 import Element.Input
@@ -258,7 +259,7 @@ scriptParseApp : Model -> { title : String, body : List (Element Msg) }
 scriptParseApp model =
     { title = "CueCannon - Script Parser"
     , body =
-        [ Element.column [ Element.width Element.fill ] <|
+        [ Element.column [ fillWidth ] <|
             case model.editingProgress of
                 AddingScript plainScript ->
                     [ topBar [], loaders plainScript model.loadedScriptPieces ]
@@ -329,17 +330,8 @@ topBar scriptPieces =
 loaders : String -> List ScriptPiece -> Element Msg
 loaders plainScript loadedScriptPieces =
     let
-        exampleLabel =
-            Element.el [ Element.Font.size 20 ] (Element.text "Load an example")
-
         exampleLoader =
             Element.row [ Element.paddingXY 20 0 ] [ Widget.textButton (Material.textButton palette) { onPress = Nothing, text = "Macbeth" } ]
-
-        copyPasteLabel =
-            Element.el [ Element.Font.size 20 ] (Element.text "Load from copy/paste")
-
-        localStorageLabel =
-            Element.el [ Element.Font.size 20 ] (Element.text "Load saved script")
 
         localStorageLoader =
             Element.el [ Element.paddingXY 20 0 ] <|
@@ -352,29 +344,35 @@ loaders plainScript loadedScriptPieces =
                             { onPress = Just ReplaceScriptPiecesWithLoaded
                             , text = "Load"
                             }
+
+        loaderView label loader =
+            Element.row
+                [ fillWidth
+                , Element.Border.widthEach { bottom = 0, left = 0, right = 0, top = 1 }
+                , Element.Border.solid
+                , Element.Border.color (Element.rgb 0.8 0.8 0.8)
+                , Element.paddingXY 10 30
+                ]
+                [ Element.el [ scaledFont 2, Element.Font.heavy ] (Element.text label)
+                , loader
+                ]
     in
     Element.column
-        [ Element.alignTop, Element.padding 50, Element.spacing 20, Element.width Element.fill ]
-        [ exampleLabel
-        , exampleLoader
-        , localStorageLabel
-        , localStorageLoader
-        , copyPasteLabel
-        , copyPasteLoader plainScript
+        [ fillWidth, Element.alignTop, Element.padding 50, Element.spacing 20 ]
+        [ Element.el [ scaledFont 3 ] (Element.text "Load a script from...")
+        , loaderView "Copy/paste" (copyPasteLoader plainScript)
+        , loaderView "Examples" exampleLoader
+        , loaderView "Previously saved script" localStorageLoader
         ]
 
 
 copyPasteLoader : String -> Element Msg
 copyPasteLoader plainScript =
-    let
-        ( fontSize, width ) =
-            ( 18, Element.fill )
-    in
     Element.el
-        [ Element.width width
+        [ fillWidth
+        , scaledFont 1
         , Element.alignRight
         , Element.alignTop
-        , Element.Font.size fontSize
         , Element.paddingXY 20 0
         ]
     <|
@@ -382,7 +380,7 @@ copyPasteLoader plainScript =
             { onChange = ChangeScript
             , text = plainScript
             , placeholder = Just (Element.Input.placeholder [] (Element.text "Paste here!"))
-            , label = Element.Input.labelAbove [] <| Element.text ""
+            , label = Element.Input.labelHidden "Copy/paste"
             , spellcheck = False
             }
 
@@ -599,3 +597,24 @@ keyboardShortcutListenerAttributes =
 
 setShortcutFocus =
     Task.attempt (\_ -> NoOp) (Browser.Dom.focus "scriptPieces")
+
+
+
+--  _____ _             _   _ ___               _   _
+-- | ____| |_ __ ___   | | | |_ _|  _ __   __ _| |_| |_ ___ _ __ _ __  ___
+-- |  _| | | '_ ` _ \  | | | || |  | '_ \ / _` | __| __/ _ \ '__| '_ \/ __|
+-- | |___| | | | | | | | |_| || |  | |_) | (_| | |_| ||  __/ |  | | | \__ \
+-- |_____|_|_| |_| |_|  \___/|___| | .__/ \__,_|\__|\__\___|_|  |_| |_|___/
+--                                 |_|
+
+
+scale =
+    Element.modular 16 1.25
+
+
+scaledFont s =
+    Element.Font.size (round (scale s))
+
+
+fillWidth =
+    Element.width Element.fill
