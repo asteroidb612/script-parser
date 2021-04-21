@@ -12,9 +12,14 @@ when inside the directory containing this file.
 -}
 
 import NoMissingTypeAnnotation
+import NoUnused.Modules
+import NoUnused.Variables
 import Review.Rule exposing (Rule)
 
 
 config : List Rule
 config =
-    [ NoMissingTypeAnnotation.rule ]
+    [ NoMissingTypeAnnotation.rule
+    , NoUnused.Modules.rule
+    , NoUnused.Variables.rule
+    ]
