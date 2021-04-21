@@ -37,8 +37,6 @@ import Widget.Material.Color
 -- /_/   \_\ .__/| .__/
 --         |_|   |_|
 -- App: Users paste a script in, then mark which script parts are character names etc, then export to the app
--- the intellij-elm plugin doesn't support type aliases for Programs so we need to use this line
--- main : Platform.Program Pages.Platform.Flags (Pages.Platform.Model Model Msg Metadata Rendered) (Pages.Platform.Msg Msg Metadata Rendered)
 
 
 main : Pages.Platform.Program Model Msg Metadata Rendered Pages.PathKey
