@@ -133,8 +133,8 @@ update msg model =
                 _ ->
                     ( m, cmd )
 
-        changingSelectedPieceTo : ScriptPieceKind -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
-        changingSelectedPieceTo k ( m, cmd ) =
+        changingSelectedPieceKindTo : ScriptPieceKind -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+        changingSelectedPieceKindTo k ( m, cmd ) =
             case m.editingProgress of
                 SplittingScript scriptPieces ->
                     let
@@ -158,6 +158,24 @@ update msg model =
 
                 _ ->
                     ( m, cmd )
+
+        checkingParser : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+        checkingParser ( m, cmd ) =
+            case m.editingProgress of
+                SplittingScript scriptPieces ->
+                    case Debug.log "Checking Script Parser" <| parseScript scriptPieces of
+                        Ok exportLink ->
+                            ( { m
+                                | editingProgress = DoneEditingScript scriptPieces exportLink
+                              }
+                            , cmd
+                            )
+
+                        Err _ ->
+                            ( m, cmd )
+
+                _ ->
+                    ( m, cmd )
     in
     case msg of
         -- Editing script and script pieces
@@ -174,8 +192,9 @@ update msg model =
 
         ChangeScriptPiece newKind ->
             ( model, Cmd.none )
-                |> changingSelectedPieceTo newKind
+                |> changingSelectedPieceKindTo newKind
                 |> selectingNextError
+                |> checkingParser
 
         SetScriptPieces pieces ->
             ( { model | editingProgress = SplittingScript pieces }, Cmd.none )
@@ -213,33 +232,39 @@ update msg model =
             case i of
                 85 ->
                     ( model, Cmd.none )
-                        |> changingSelectedPieceTo UnsurePiece
+                        |> changingSelectedPieceKindTo UnsurePiece
                         |> selectingNextError
+                        |> checkingParser
 
                 67 ->
                     ( model, Cmd.none )
-                        |> changingSelectedPieceTo CharacterPiece
+                        |> changingSelectedPieceKindTo CharacterPiece
                         |> selectingNextError
+                        |> checkingParser
 
                 76 ->
                     ( model, Cmd.none )
-                        |> changingSelectedPieceTo LinePiece
+                        |> changingSelectedPieceKindTo LinePiece
                         |> selectingNextError
+                        |> checkingParser
 
                 73 ->
                     ( model, Cmd.none )
-                        |> changingSelectedPieceTo IgnorePiece
+                        |> changingSelectedPieceKindTo IgnorePiece
                         |> selectingNextError
+                        |> checkingParser
 
                 83 ->
                     ( model, Cmd.none )
-                        |> changingSelectedPieceTo StageDirectionPiece
+                        |> changingSelectedPieceKindTo StageDirectionPiece
                         |> selectingNextError
+                        |> checkingParser
 
                 84 ->
                     ( model, Cmd.none )
-                        |> changingSelectedPieceTo TitlePiece
+                        |> changingSelectedPieceKindTo TitlePiece
                         |> selectingNextError
+                        |> checkingParser
 
                 _ ->
                     ( model, Cmd.none )
@@ -252,7 +277,7 @@ subscriptions : Metadata -> pages -> Model -> Sub Msg
 subscriptions _ _ _ =
     loadScriptPieces
         (\value ->
-            case Debug.log "loadScriptPieces" <| D.decodeValue decodeScriptPieces value of
+            case D.decodeValue decodeScriptPieces value of
                 Ok pieces ->
                     LoadedScriptPieces pieces
 
@@ -273,6 +298,15 @@ subscriptions _ _ _ =
 
 scriptParseApp : Model -> { title : String, body : List (Element Msg) }
 scriptParseApp model =
+    let
+        scriptSplitter =
+            scriptPieces
+                |> List.indexedMap (scriptPieceView model.selectedPiece model.labelMouseOver)
+                |> Element.textColumn
+                    ([ Element.spacing 5, Element.padding 20, Element.centerX ]
+                        ++ keyboardShortcutListenerAttributes
+                    )
+    in
     { title = "CueCannon - Script Parser"
     , body =
         [ Element.column [ fillWidth ] <|
@@ -285,16 +319,10 @@ scriptParseApp model =
                     loaders plainScript model.loadedScriptPieces
 
                 SplittingScript scriptPieces ->
-                    scriptPieces
-                        |> List.indexedMap (scriptPieceView model.selectedPiece model.labelMouseOver)
-                        |> Element.textColumn
-                            ([ Element.spacing 5, Element.padding 20, Element.centerX ] ++ keyboardShortcutListenerAttributes)
+                    scriptSplitter
 
                 DoneEditingScript scriptPieces exportLink ->
-                    scriptPieces
-                        |> List.indexedMap (scriptPieceView model.selectedPiece model.labelMouseOver)
-                        |> Element.textColumn
-                            ([ Element.spacing 5, Element.padding 20 ] ++ keyboardShortcutListenerAttributes)
+                    scriptSplitter
             ]
         ]
     }
@@ -328,8 +356,8 @@ topBar progress =
             , onPress = Nothing
             }
     in
-    buttonWrapper
-        (case progress of
+    buttonWrapper <|
+        case progress of
             JustStarting ->
                 [ firstButton, arrow, secondButton, arrow, exportButton ]
 
@@ -363,8 +391,6 @@ topBar progress =
                   , onPress = Just (Export (cueCannonUrl exportLink))
                   }
                 ]
-        )
-        []
 
 
 loaders : String -> List ScriptPiece -> Element Msg
@@ -408,7 +434,7 @@ loaders plainScript loadedScriptPieces =
         [ Element.el [ scaledFont 3 ] (Element.text "Load a script from...")
         , loaderView "Copy/Paste" (copyPasteLoader plainScript)
         , loaderView "Examples" exampleLoader
-        , loaderView "Saves" localStorageLoader
+        , loaderView "Saved" localStorageLoader
         ]
 
 
@@ -609,8 +635,8 @@ colorFromScriptPiece kind =
             palette.primary
 
 
-buttonWrapper leftButtons rightButtons =
-    Widget.buttonBar (Material.buttonBar leftButtons palette) (barConfig rightButtons)
+buttonWrapper leftButtons =
+    Widget.buttonBar (Material.buttonBar leftButtons palette) (barConfig [])
 
 
 barConfig actions =
