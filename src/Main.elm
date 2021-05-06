@@ -299,8 +299,8 @@ subscriptions _ _ _ =
 scriptParseApp : Model -> { title : String, body : List (Element Msg) }
 scriptParseApp model =
     let
-        scriptSplitter =
-            scriptPieces
+        scriptSplitter pieces =
+            pieces
                 |> List.indexedMap (scriptPieceView model.selectedPiece model.labelMouseOver)
                 |> Element.textColumn
                     ([ Element.spacing 5, Element.padding 20, Element.centerX ]
@@ -319,10 +319,10 @@ scriptParseApp model =
                     loaders plainScript model.loadedScriptPieces
 
                 SplittingScript scriptPieces ->
-                    scriptSplitter
+                    scriptSplitter scriptPieces
 
-                DoneEditingScript scriptPieces exportLink ->
-                    scriptSplitter
+                DoneEditingScript scriptPieces _ ->
+                    scriptSplitter scriptPieces
             ]
         ]
     }
