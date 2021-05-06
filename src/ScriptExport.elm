@@ -1,7 +1,19 @@
-module ScriptExport exposing (ParseState(..), Script, ScriptLine, ScriptPiece(..), ScriptPieceKind(..), cueCannonUrl, parseScript, parseScriptHelper, scriptPiecesFromPlainScript)
+module ScriptExport exposing
+    ( ParseState(..)
+    , Script
+    , ScriptLine
+    , ScriptPiece(..)
+    , ScriptPieceKind(..)
+    , cueCannonUrl
+    , extractPlainScript
+    , parseScript
+    , parseScriptHelper
+    , scriptPiecesFromPlainScript
+    )
 
 import Base64
 import Json.Encode
+import List.Extra
 
 
 
@@ -78,22 +90,32 @@ type
     | TitlePiece
 
 
-scriptPiecesFromPlainScript : String -> List ScriptPiece
-scriptPiecesFromPlainScript plain =
-    if plain == "" then
-        []
+scriptPiecesFromPlainScript : String -> List ScriptPiece -> List ScriptPiece
+scriptPiecesFromPlainScript plain oldPieces =
+    let
+        plainLines =
+            String.split "\n" plain
 
-    else
-        plain
-            |> String.split "\n"
-            |> List.map
-                (\x ->
-                    if x == "" then
-                        ScriptPiece IgnorePiece x
+        pieceFromLine line =
+            if line == "" then
+                ScriptPiece IgnorePiece line
+
+            else
+                ScriptPiece UnsurePiece line
+
+        matchingOldPiece i line =
+            case List.Extra.getAt i oldPieces of
+                Just (ScriptPiece kind piece) ->
+                    if line == piece then
+                        ScriptPiece kind line
 
                     else
-                        ScriptPiece UnsurePiece x
-                )
+                        pieceFromLine line
+
+                _ ->
+                    pieceFromLine line
+    in
+    List.indexedMap matchingOldPiece plainLines
 
 
 type ParseState
@@ -185,3 +207,10 @@ parseScript scriptPieces =
 
         StartingParse ->
             Err "No script"
+
+
+extractPlainScript : List ScriptPiece -> String
+extractPlainScript scriptPieces =
+    scriptPieces
+        |> List.map (\(ScriptPiece _ s) -> s)
+        |> String.join "\n"

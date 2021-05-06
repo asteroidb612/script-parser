@@ -20,7 +20,15 @@ import Material.Icons.Types exposing (Coloring(..))
 import Metadata exposing (Metadata)
 import Pages exposing (images, pages)
 import Pages.Platform
-import ScriptExport exposing (ScriptPiece(..), ScriptPieceKind(..), cueCannonUrl, parseScript, scriptPiecesFromPlainScript)
+import ScriptExport
+    exposing
+        ( ScriptPiece(..)
+        , ScriptPieceKind(..)
+        , cueCannonUrl
+        , extractPlainScript
+        , parseScript
+        , scriptPiecesFromPlainScript
+        )
 import Storage exposing (decodeScriptPieces, loadScriptPieces, storeScriptPieces)
 import Task
 import Widget
@@ -63,9 +71,10 @@ type alias Rendered =
 type Msg
     = NoOp
       -- Script actions
-    | ChangeScript String
+    | ChangeScript (List ScriptPiece) String
     | Export String
     | ChangeScriptPiece ScriptPieceKind
+    | SetScriptPieces (List ScriptPiece)
     | LoadedScriptPieces (List ScriptPiece)
     | ReplaceScriptPiecesWithLoaded
       -- View actions
@@ -77,9 +86,10 @@ type Msg
 
 
 type EditingProgress
-    = AddingScript String
-    | EditingScript (List ScriptPiece)
-    | DoneEditingScript (List ScriptPiece) String
+    = JustStarting
+    | EditingScript String (List ScriptPiece)
+    | SplittingScript (List ScriptPiece)
+    | DoneEditingScript (List ScriptPiece) ScriptExport.Script
 
 
 type alias Model =
@@ -95,7 +105,7 @@ type alias Model =
 
 init : ( Model, Cmd Msg )
 init =
-    ( { editingProgress = AddingScript ""
+    ( { editingProgress = JustStarting
       , loadedScriptPieces = []
       , selectedPiece = Nothing
       , labelMouseOver = Nothing
@@ -110,7 +120,7 @@ update msg model =
         selectingNextError : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
         selectingNextError ( m, cmd ) =
             case m.editingProgress of
-                EditingScript scriptPieces ->
+                SplittingScript scriptPieces ->
                     ( { m
                         | selectedPiece =
                             List.Extra.findIndex
@@ -126,7 +136,7 @@ update msg model =
         changingSelectedPieceTo : ScriptPieceKind -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
         changingSelectedPieceTo k ( m, cmd ) =
             case m.editingProgress of
-                EditingScript scriptPieces ->
+                SplittingScript scriptPieces ->
                     let
                         changeScriptPieceType (ScriptPiece _ line) =
                             ScriptPiece k line
@@ -141,7 +151,7 @@ update msg model =
                                     scriptPieces
                     in
                     ( { m
-                        | editingProgress = EditingScript newScriptPieces
+                        | editingProgress = SplittingScript newScriptPieces
                       }
                     , Cmd.batch (storeScriptPieces newScriptPieces :: [ cmd ])
                     )
@@ -154,19 +164,22 @@ update msg model =
         Export href ->
             ( model, Nav.load href )
 
-        ChangeScript s ->
-            ( { model | editingProgress = AddingScript s }, Cmd.none )
+        ChangeScript l s ->
+            ( { model | editingProgress = EditingScript s l }, Cmd.none )
 
         ChangeScriptPiece newKind ->
             ( model, Cmd.none )
                 |> changingSelectedPieceTo newKind
                 |> selectingNextError
 
+        SetScriptPieces pieces ->
+            ( { model | editingProgress = SplittingScript pieces }, Cmd.none )
+
         LoadedScriptPieces pieces ->
             ( { model | loadedScriptPieces = pieces }, Cmd.none )
 
         ReplaceScriptPiecesWithLoaded ->
-            ( { model | editingProgress = EditingScript model.loadedScriptPieces }, Cmd.none )
+            ( { model | editingProgress = SplittingScript model.loadedScriptPieces }, Cmd.none )
 
         -- UI Changes
         LabelMouseEnter i ->
@@ -177,7 +190,7 @@ update msg model =
 
         SelectPiece i ->
             case model.editingProgress of
-                EditingScript scriptPieces ->
+                SplittingScript scriptPieces ->
                     if List.length scriptPieces > i && i >= 0 then
                         ( { model | selectedPiece = Just i }, setShortcutFocus )
 
@@ -258,52 +271,33 @@ scriptParseApp model =
     { title = "CueCannon - Script Parser"
     , body =
         [ Element.column [ fillWidth ] <|
-            case model.editingProgress of
-                AddingScript plainScript ->
-                    [ topBar [], loaders plainScript model.loadedScriptPieces ]
+            [ topBar model.editingProgress
+            , case model.editingProgress of
+                JustStarting ->
+                    loaders "" model.loadedScriptPieces
 
-                EditingScript scriptPieces ->
-                    [ topBar scriptPieces
-                    , scriptPieces
+                EditingScript plainScript _ ->
+                    loaders plainScript model.loadedScriptPieces
+
+                SplittingScript scriptPieces ->
+                    scriptPieces
                         |> List.indexedMap (scriptPieceView model.selectedPiece model.labelMouseOver)
                         |> Element.textColumn
                             ([ Element.spacing 5, Element.padding 20 ] ++ keyboardShortcutListenerAttributes)
-                    ]
 
-                DoneEditingScript scriptPieces _ ->
-                    [ topBar scriptPieces
-                    , scriptPieces
+                DoneEditingScript scriptPieces exportLink ->
+                    scriptPieces
                         |> List.indexedMap (scriptPieceView model.selectedPiece model.labelMouseOver)
                         |> Element.textColumn
                             ([ Element.spacing 5, Element.padding 20 ] ++ keyboardShortcutListenerAttributes)
-                    ]
+            ]
         ]
     }
 
 
-topBar : List ScriptPiece -> Element Msg
-topBar scriptPieces =
+topBar : EditingProgress -> Element Msg
+topBar progress =
     let
-        errorCount =
-            scriptPieces
-                |> List.filter (\(ScriptPiece kind _) -> kind == UnsurePiece)
-                |> List.length
-
-        ( exportIcon, exportMsg ) =
-            case parseScript scriptPieces of
-                Err _ ->
-                    ( Material.Icons.cancel, Nothing )
-
-                Ok href ->
-                    ( Material.Icons.upgrade, Just (Export (cueCannonUrl href)) )
-
-        exportButton =
-            { icon =
-                exportIcon |> Widget.Icon.elmMaterialIcons Color
-            , text = "Open script in app"
-            , onPress = exportMsg
-            }
-
         firstButton =
             { icon = Material.Icons.book |> Widget.Icon.elmMaterialIcons Color
             , text = "Select script"
@@ -313,7 +307,14 @@ topBar scriptPieces =
         secondButton =
             { icon = Material.Icons.edit |> Widget.Icon.elmMaterialIcons Color
             , text = "Split script into cues"
-            , onPress = Just NoOp
+            , onPress = Nothing
+            }
+
+        exportButton =
+            { icon =
+                Material.Icons.cancel |> Widget.Icon.elmMaterialIcons Color
+            , text = "Open script in app"
+            , onPress = Nothing
             }
 
         arrow =
@@ -322,7 +323,41 @@ topBar scriptPieces =
             , onPress = Nothing
             }
     in
-    buttonWrapper [] [ firstButton, arrow, secondButton, arrow, exportButton ]
+    buttonWrapper [] <|
+        case progress of
+            JustStarting ->
+                [ firstButton, arrow, secondButton, arrow, exportButton ]
+
+            EditingScript plainScript oldScriptPieces ->
+                let
+                    splitScript =
+                        Just <| SetScriptPieces <| scriptPiecesFromPlainScript plainScript oldScriptPieces
+                in
+                [ firstButton, arrow, { secondButton | onPress = splitScript }, arrow, exportButton ]
+
+            SplittingScript scriptPieces ->
+                let
+                    plainScript =
+                        extractPlainScript scriptPieces
+                in
+                [ { firstButton | text = "Edit script", onPress = Just (ChangeScript scriptPieces plainScript) }
+                , arrow
+                , secondButton
+                , arrow
+                , exportButton
+                ]
+
+            DoneEditingScript scriptPieces exportLink ->
+                [ firstButton
+                , arrow
+                , secondButton
+                , arrow
+                , { icon =
+                        Material.Icons.upgrade |> Widget.Icon.elmMaterialIcons Color
+                  , text = "Open script in app"
+                  , onPress = Just (Export (cueCannonUrl exportLink))
+                  }
+                ]
 
 
 loaders : String -> List ScriptPiece -> Element Msg
@@ -375,7 +410,7 @@ copyPasteLoader plainScript =
         ]
     <|
         Element.Input.multiline []
-            { onChange = ChangeScript
+            { onChange = ChangeScript []
             , text = plainScript
             , placeholder = Just (Element.Input.placeholder [] (Element.text "Paste here!"))
             , label = Element.Input.labelHidden "Copy/paste"
