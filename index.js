@@ -20,4 +20,7 @@ pagesInit({
       JSON.stringify(scriptPieces)
     );
   });
+  app.ports.loadScriptPieces.send(
+    JSON.parse(localStorage.getItem("cuecannon-script-pieces"))
+  );
 });

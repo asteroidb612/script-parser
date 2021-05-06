@@ -252,7 +252,7 @@ subscriptions : Metadata -> pages -> Model -> Sub Msg
 subscriptions _ _ _ =
     loadScriptPieces
         (\value ->
-            case D.decodeValue decodeScriptPieces value of
+            case Debug.log "loadScriptPieces" <| D.decodeValue decodeScriptPieces value of
                 Ok pieces ->
                     LoadedScriptPieces pieces
 
@@ -288,7 +288,7 @@ scriptParseApp model =
                     scriptPieces
                         |> List.indexedMap (scriptPieceView model.selectedPiece model.labelMouseOver)
                         |> Element.textColumn
-                            ([ Element.spacing 5, Element.padding 20 ] ++ keyboardShortcutListenerAttributes)
+                            ([ Element.spacing 5, Element.padding 20, Element.centerX ] ++ keyboardShortcutListenerAttributes)
 
                 DoneEditingScript scriptPieces exportLink ->
                     scriptPieces
@@ -328,8 +328,8 @@ topBar progress =
             , onPress = Nothing
             }
     in
-    buttonWrapper [] <|
-        case progress of
+    buttonWrapper
+        (case progress of
             JustStarting ->
                 [ firstButton, arrow, secondButton, arrow, exportButton ]
 
@@ -363,6 +363,8 @@ topBar progress =
                   , onPress = Just (Export (cueCannonUrl exportLink))
                   }
                 ]
+        )
+        []
 
 
 loaders : String -> List ScriptPiece -> Element Msg
@@ -372,7 +374,7 @@ loaders plainScript loadedScriptPieces =
             Element.row [ Element.paddingXY 20 0 ]
                 [ Widget.textButton (Material.textButton palette)
                     { onPress =
-                        Just <| SetScriptPieces <| makeScriptPieces scene1 []
+                        Just (SetScriptPieces (makeScriptPieces scene1 []))
                     , text = "Macbeth"
                     }
                 ]
@@ -386,7 +388,7 @@ loaders plainScript loadedScriptPieces =
                     _ ->
                         Widget.textButton (Material.textButton palette)
                             { onPress = Just ReplaceScriptPiecesWithLoaded
-                            , text = "Load"
+                            , text = "Previously saved script"
                             }
 
         loaderView label loader =
@@ -404,9 +406,9 @@ loaders plainScript loadedScriptPieces =
     Element.column
         [ fillWidth, Element.alignTop, Element.padding 50, Element.spacing 20 ]
         [ Element.el [ scaledFont 3 ] (Element.text "Load a script from...")
-        , loaderView "Copy/paste" (copyPasteLoader plainScript)
+        , loaderView "Copy/Paste" (copyPasteLoader plainScript)
         , loaderView "Examples" exampleLoader
-        , loaderView "Previously saved script" localStorageLoader
+        , loaderView "Saves" localStorageLoader
         ]
 
 
@@ -424,7 +426,7 @@ copyPasteLoader plainScript =
             { onChange = ChangeScript []
             , text = plainScript
             , placeholder = Just (Element.Input.placeholder [] (Element.text "Paste here!"))
-            , label = Element.Input.labelHidden "Copy/paste"
+            , label = Element.Input.labelHidden "Copy/Paste"
             , spellcheck = False
             }
 
@@ -619,7 +621,7 @@ barConfig actions =
     , primaryActions = actions
     , search = Nothing
     , title =
-        Element.row [ Element.padding 8, Element.spacing 4 ]
+        Element.row [ Element.paddingXY 16 8, Element.spacing 4 ]
             [ Widget.Icon.elmMaterialIcons Color Material.Icons.question_answer <|
                 { size = 20, color = palette.on.primary }
             , Element.text "Cue Maker"
