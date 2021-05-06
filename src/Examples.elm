@@ -1,4 +1,4 @@
-module Macbeth exposing (scene1)
+module Examples exposing (scene1)
 
 
 scene1 =

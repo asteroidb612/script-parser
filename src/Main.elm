@@ -10,11 +10,11 @@ import Element.Events
 import Element.Font
 import Element.Input
 import ElmPages exposing (canonicalSiteUrl, generateFiles, manifest, markdownDocument, view)
+import Examples exposing (scene1)
 import Html.Attributes
 import Html.Events
 import Json.Decode as D
 import List.Extra
-import Macbeth exposing (scene1)
 import Material.Icons exposing (offline_bolt)
 import Material.Icons.Types exposing (Coloring(..))
 import Metadata exposing (Metadata)
@@ -164,8 +164,13 @@ update msg model =
         Export href ->
             ( model, Nav.load href )
 
-        ChangeScript l s ->
-            ( { model | editingProgress = EditingScript s l }, Cmd.none )
+        ChangeScript ll s ->
+            case model.editingProgress of
+                EditingScript _ l ->
+                    ( { model | editingProgress = EditingScript s l }, Cmd.none )
+
+                _ ->
+                    ( { model | editingProgress = EditingScript s ll }, Cmd.none )
 
         ChangeScriptPiece newKind ->
             ( model, Cmd.none )
