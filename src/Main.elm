@@ -20,14 +20,14 @@ import Material.Icons.Types exposing (Coloring(..))
 import Metadata exposing (Metadata)
 import Pages exposing (images, pages)
 import Pages.Platform
-import ScriptExport
+import Scripts
     exposing
         ( ScriptPiece(..)
         , ScriptPieceKind(..)
         , cueCannonUrl
         , extractPlainScript
+        , makeScriptPieces
         , parseScript
-        , scriptPiecesFromPlainScript
         )
 import Storage exposing (decodeScriptPieces, loadScriptPieces, storeScriptPieces)
 import Task
@@ -89,7 +89,7 @@ type EditingProgress
     = JustStarting
     | EditingScript String (List ScriptPiece)
     | SplittingScript (List ScriptPiece)
-    | DoneEditingScript (List ScriptPiece) ScriptExport.Script
+    | DoneEditingScript (List ScriptPiece) Scripts.Script
 
 
 type alias Model =
@@ -336,7 +336,7 @@ topBar progress =
             EditingScript plainScript oldScriptPieces ->
                 let
                     splitScript =
-                        Just <| SetScriptPieces <| scriptPiecesFromPlainScript plainScript oldScriptPieces
+                        Just <| SetScriptPieces <| makeScriptPieces plainScript oldScriptPieces
                 in
                 [ firstButton, arrow, { secondButton | onPress = splitScript }, arrow, exportButton ]
 

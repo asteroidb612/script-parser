@@ -1,4 +1,4 @@
-module ScriptExport exposing
+module Scripts exposing
     ( ParseState(..)
     , Script
     , ScriptLine
@@ -6,9 +6,9 @@ module ScriptExport exposing
     , ScriptPieceKind(..)
     , cueCannonUrl
     , extractPlainScript
+    , makeScriptPieces
     , parseScript
     , parseScriptHelper
-    , scriptPiecesFromPlainScript
     )
 
 import Base64
@@ -90,8 +90,8 @@ type
     | TitlePiece
 
 
-scriptPiecesFromPlainScript : String -> List ScriptPiece -> List ScriptPiece
-scriptPiecesFromPlainScript plain oldPieces =
+makeScriptPieces : String -> List ScriptPiece -> List ScriptPiece
+makeScriptPieces plain oldPieces =
     let
         plainLines =
             String.split "\n" plain
