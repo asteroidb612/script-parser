@@ -104,6 +104,7 @@ makeScriptPieces plain oldPieces =
                 ScriptPiece UnsurePiece line
 
         matchingOldPiece i line =
+            -- FIXME Can we manipulate newlines / blank lines to preserve more edits?
             case List.Extra.getAt i oldPieces of
                 Just (ScriptPiece kind piece) ->
                     if line == piece then

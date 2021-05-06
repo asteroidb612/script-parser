@@ -347,7 +347,7 @@ topBar progress =
                 in
                 [ { firstButton | text = "Edit script", onPress = Just (ChangeScript scriptPieces plainScript) }
                 , arrow
-                , secondButton
+                , { secondButton | onPress = Just NoOp }
                 , arrow
                 , exportButton
                 ]
@@ -369,7 +369,13 @@ loaders : String -> List ScriptPiece -> Element Msg
 loaders plainScript loadedScriptPieces =
     let
         exampleLoader =
-            Element.row [ Element.paddingXY 20 0 ] [ Widget.textButton (Material.textButton palette) { onPress = Nothing, text = "Macbeth" } ]
+            Element.row [ Element.paddingXY 20 0 ]
+                [ Widget.textButton (Material.textButton palette)
+                    { onPress =
+                        Just <| SetScriptPieces <| makeScriptPieces scene1 []
+                    , text = "Macbeth"
+                    }
+                ]
 
         localStorageLoader =
             Element.el [ Element.paddingXY 20 0 ] <|
