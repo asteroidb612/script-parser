@@ -9,8 +9,9 @@ import Element.Border
 import Element.Events
 import Element.Font
 import Element.Input
+import Element.Lazy
 import ElmPages exposing (canonicalSiteUrl, generateFiles, manifest, markdownDocument, view)
-import Examples exposing (scene1)
+import Examples exposing (book, scene1)
 import Html.Attributes
 import Html.Events
 import Json.Decode as D
@@ -121,13 +122,16 @@ update msg model =
         selectingNextError ( m, cmd ) =
             case m.editingProgress of
                 SplittingScript scriptPieces ->
-                    ( { m
-                        | selectedPiece =
+                    let
+                        scriptPieceIndex =
                             List.Extra.findIndex
                                 (\(ScriptPiece kind _) -> kind == UnsurePiece)
                                 scriptPieces
+                    in
+                    ( { m
+                        | selectedPiece = scriptPieceIndex
                       }
-                    , cmd
+                    , Cmd.batch [ cmd, scrollToScriptPiece scriptPieceIndex ]
                     )
 
                 _ ->
@@ -163,12 +167,12 @@ update msg model =
         checkingParser ( m, cmd ) =
             case m.editingProgress of
                 SplittingScript scriptPieces ->
-                    case Debug.log "Checking Script Parser" <| parseScript scriptPieces of
+                    case parseScript scriptPieces of
                         Ok exportLink ->
                             ( { m
                                 | editingProgress = DoneEditingScript scriptPieces exportLink
                               }
-                            , cmd
+                            , Cmd.batch [ cmd, scrollToTop ]
                             )
 
                         Err _ ->
@@ -381,9 +385,13 @@ topBar progress =
                 ]
 
             DoneEditingScript scriptPieces exportLink ->
-                [ firstButton
+                let
+                    plainScript =
+                        extractPlainScript scriptPieces
+                in
+                [ { firstButton | text = "Edit script", onPress = Just (ChangeScript scriptPieces plainScript) }
                 , arrow
-                , secondButton
+                , { secondButton | onPress = Just NoOp }
                 , arrow
                 , { icon =
                         Material.Icons.upgrade |> Widget.Icon.elmMaterialIcons Color
@@ -402,6 +410,11 @@ loaders plainScript loadedScriptPieces =
                     { onPress =
                         Just (SetScriptPieces (makeScriptPieces scene1 []))
                     , text = "Macbeth"
+                    }
+                , Widget.textButton (Material.textButton palette)
+                    { onPress =
+                        Just (SetScriptPieces (makeScriptPieces book []))
+                    , text = "Hamilton"
                     }
                 ]
 
@@ -669,6 +682,28 @@ keyboardShortcutListenerAttributes =
 
 setShortcutFocus =
     Task.attempt (\_ -> NoOp) (Browser.Dom.focus "scriptPieces")
+
+
+scrollToTop =
+    Task.attempt (\_ -> NoOp) (Browser.Dom.setViewport 0 0)
+
+
+scrollToScriptPiece scriptPieceIndex =
+    case scriptPieceIndex of
+        Just index ->
+            let
+                -- FIXME Just picked from Brave in testing
+                scriptPiecePixelHeight =
+                    26
+
+                scrollHeight =
+                    toFloat (scriptPiecePixelHeight * index)
+            in
+            Browser.Dom.setViewport 0 scrollHeight
+                |> Task.attempt (\_ -> NoOp)
+
+        Nothing ->
+            Cmd.none
 
 
 
