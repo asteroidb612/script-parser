@@ -111,6 +111,7 @@ markdownDocument =
 
 view :
     ScriptParseApp model msg
+    -> (model -> Element msg)
     -> List ( PagePath Pages.PathKey, Metadata )
     ->
         { path : PagePath Pages.PathKey
@@ -121,11 +122,14 @@ view :
             { view : model -> Rendered msg -> { title : String, body : Html msg }
             , head : List (Head.Tag Pages.PathKey)
             }
-view scriptParseApp siteMetadata page =
+view scriptParseApp scriptParseTopBar siteMetadata page =
     StaticHttp.succeed
         { view =
             \model viewForPage ->
-                Layout.view (pageView scriptParseApp model siteMetadata page viewForPage) page
+                Layout.view
+                    (pageView scriptParseApp model siteMetadata page viewForPage)
+                    (scriptParseTopBar model)
+                    page
         , head = head page.frontmatter
         }
 

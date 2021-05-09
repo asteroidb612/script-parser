@@ -207,7 +207,7 @@ parseScript scriptPieces =
             Ok (Script title (lines ++ [ { speaker = characterName, identifier = "", line = lineSoFar } ]))
 
         StartingParse ->
-            Err "No script"
+            Err "Script has no cues"
 
 
 extractPlainScript : List ScriptPiece -> String

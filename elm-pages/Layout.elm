@@ -16,12 +16,13 @@ import Palette
 
 view :
     { title : String, body : List (Element msg) }
+    -> Element msg
     ->
         { path : PagePath Pages.PathKey
         , frontmatter : Metadata
         }
     -> { title : String, body : Html msg }
-view document page =
+view document topBar page =
     { title = document.title
     , body =
         Element.column
@@ -40,6 +41,7 @@ view document page =
                 , Font.size 20
                 , Font.family [ Font.typeface "Roboto" ]
                 , Font.color (Element.rgba255 0 0 0 0.8)
+                , Element.inFront topBar
                 ]
     }
 

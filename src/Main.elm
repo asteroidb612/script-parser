@@ -52,7 +52,7 @@ main : Pages.Platform.Program Model Msg Metadata Rendered Pages.PathKey
 main =
     Pages.Platform.init
         { init = \_ -> init
-        , view = view scriptParseApp
+        , view = view scriptParseApp scriptParseTopBar
         , update = update
         , subscriptions = subscriptions
         , documents = [ markdownDocument ]
@@ -101,6 +101,7 @@ type alias Model =
     -- View data
     , selectedPiece : Maybe Int
     , labelMouseOver : Maybe Int
+    , parseError : Maybe String
     }
 
 
@@ -110,77 +111,36 @@ init =
       , loadedScriptPieces = []
       , selectedPiece = Nothing
       , labelMouseOver = Nothing
+      , parseError = Nothing
       }
     , setShortcutFocus
     )
 
 
+subscriptions : Metadata -> pages -> Model -> Sub Msg
+subscriptions _ _ _ =
+    loadScriptPieces
+        (\value ->
+            case D.decodeValue decodeScriptPieces value of
+                Ok pieces ->
+                    LoadedScriptPieces pieces
+
+                Err _ ->
+                    NoOp
+        )
+
+
+
+--  _   _           _       _                 _          _
+-- | | | |_ __   __| | __ _| |_ ___     _    | |__   ___| |_ __   ___ _ __ ___
+-- | | | | '_ \ / _` |/ _` | __/ _ \  _| |_  | '_ \ / _ \ | '_ \ / _ \ '__/ __|
+-- | |_| | |_) | (_| | (_| | ||  __/ |_   _| | | | |  __/ | |_) |  __/ |  \__ \
+--  \___/| .__/ \__,_|\__,_|\__\___|   |_|   |_| |_|\___|_| .__/ \___|_|  |___/
+--       |_|                                              |_|
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    let
-        selectingNextError : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
-        selectingNextError ( m, cmd ) =
-            case m.editingProgress of
-                SplittingScript scriptPieces ->
-                    let
-                        scriptPieceIndex =
-                            List.Extra.findIndex
-                                (\(ScriptPiece kind _) -> kind == UnsurePiece)
-                                scriptPieces
-                    in
-                    ( { m
-                        | selectedPiece = scriptPieceIndex
-                      }
-                    , Cmd.batch [ cmd, scrollToScriptPiece scriptPieceIndex ]
-                    )
-
-                _ ->
-                    ( m, cmd )
-
-        changingSelectedPieceKindTo : ScriptPieceKind -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
-        changingSelectedPieceKindTo k ( m, cmd ) =
-            case m.editingProgress of
-                SplittingScript scriptPieces ->
-                    let
-                        changeScriptPieceType (ScriptPiece _ line) =
-                            ScriptPiece k line
-
-                        newScriptPieces =
-                            case m.selectedPiece of
-                                Just i ->
-                                    scriptPieces
-                                        |> List.Extra.updateAt i changeScriptPieceType
-
-                                Nothing ->
-                                    scriptPieces
-                    in
-                    ( { m
-                        | editingProgress = SplittingScript newScriptPieces
-                      }
-                    , Cmd.batch (storeScriptPieces newScriptPieces :: [ cmd ])
-                    )
-
-                _ ->
-                    ( m, cmd )
-
-        checkingParser : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
-        checkingParser ( m, cmd ) =
-            case m.editingProgress of
-                SplittingScript scriptPieces ->
-                    case parseScript scriptPieces of
-                        Ok exportLink ->
-                            ( { m
-                                | editingProgress = DoneEditingScript scriptPieces exportLink
-                              }
-                            , Cmd.batch [ cmd, scrollToTop ]
-                            )
-
-                        Err _ ->
-                            ( m, cmd )
-
-                _ ->
-                    ( m, cmd )
-    in
     case msg of
         -- Editing script and script pieces
         Export href ->
@@ -219,6 +179,13 @@ update msg model =
         SelectPiece i ->
             case model.editingProgress of
                 SplittingScript scriptPieces ->
+                    if List.length scriptPieces > i && i >= 0 then
+                        ( { model | selectedPiece = Just i }, setShortcutFocus )
+
+                    else
+                        ( model, setShortcutFocus )
+
+                DoneEditingScript scriptPieces _ ->
                     if List.length scriptPieces > i && i >= 0 then
                         ( { model | selectedPiece = Just i }, setShortcutFocus )
 
@@ -277,17 +244,81 @@ update msg model =
             ( model, Cmd.none )
 
 
-subscriptions : Metadata -> pages -> Model -> Sub Msg
-subscriptions _ _ _ =
-    loadScriptPieces
-        (\value ->
-            case D.decodeValue decodeScriptPieces value of
-                Ok pieces ->
-                    LoadedScriptPieces pieces
+selectingNextError : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+selectingNextError ( m, cmd ) =
+    case m.editingProgress of
+        SplittingScript scriptPieces ->
+            let
+                scriptPieceIndex =
+                    List.Extra.findIndex
+                        (\(ScriptPiece kind _) -> kind == UnsurePiece)
+                        scriptPieces
+            in
+            ( { m
+                | selectedPiece = scriptPieceIndex
+              }
+            , Cmd.batch [ cmd, scrollToScriptPiece scriptPieceIndex ]
+            )
 
-                Err _ ->
-                    NoOp
-        )
+        _ ->
+            ( m, cmd )
+
+
+changingSelectedPieceKindTo : ScriptPieceKind -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+changingSelectedPieceKindTo k ( m, cmd ) =
+    let
+        changePiece scriptPieces =
+            let
+                changeScriptPieceType (ScriptPiece _ line) =
+                    ScriptPiece k line
+
+                newScriptPieces =
+                    case m.selectedPiece of
+                        Just i ->
+                            scriptPieces |> List.Extra.updateAt i changeScriptPieceType
+
+                        Nothing ->
+                            scriptPieces
+            in
+            ( { m | editingProgress = SplittingScript newScriptPieces }, Cmd.batch (storeScriptPieces newScriptPieces :: [ cmd ]) )
+    in
+    case m.editingProgress of
+        SplittingScript scriptPieces ->
+            changePiece scriptPieces
+
+        DoneEditingScript scriptPieces _ ->
+            changePiece scriptPieces
+
+        _ ->
+            ( m, cmd )
+
+
+checkingParser : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+checkingParser ( m, cmd ) =
+    case m.editingProgress of
+        SplittingScript scriptPieces ->
+            let
+                anyUnsurePieces =
+                    List.any (\(ScriptPiece kind _) -> kind == UnsurePiece) scriptPieces
+            in
+            case parseScript scriptPieces of
+                Ok exportLink ->
+                    ( { m
+                        | editingProgress = DoneEditingScript scriptPieces exportLink
+                        , parseError = Nothing
+                      }
+                    , Cmd.batch [ cmd, scrollToTop ]
+                    )
+
+                Err e ->
+                    if anyUnsurePieces then
+                        ( m, cmd )
+
+                    else
+                        ( { m | parseError = Just e }, Cmd.batch [ cmd, scrollToTop ] )
+
+        _ ->
+            ( m, cmd )
 
 
 
@@ -298,6 +329,7 @@ subscriptions _ _ _ =
 -- |____/ \___|_|  |_| .__/ \__| |_|_| |_|\__\___|_|  |_|  \__,_|\___\___|
 --                   |_|
 -- Script interface: A user can go through what they've copy-pasted and mark parts
+-- FIXME We could work more closely with the elm-pages structure instead of passing views into it
 
 
 scriptParseApp : Model -> { title : String, body : List (Element Msg) }
@@ -314,7 +346,8 @@ scriptParseApp model =
     { title = "CueCannon - Script Parser"
     , body =
         [ Element.column [ fillWidth ] <|
-            [ topBar model.editingProgress
+            [ scriptParseTopBar model
+            , toast model
             , case model.editingProgress of
                 JustStarting ->
                     loaders "" model.loadedScriptPieces
@@ -332,8 +365,23 @@ scriptParseApp model =
     }
 
 
-topBar : EditingProgress -> Element Msg
-topBar progress =
+toast : Model -> Element Msg
+toast model =
+    case model.parseError of
+        Nothing ->
+            Element.none
+
+        Just err ->
+            Element.el
+                (fillWidth
+                    :: Element.padding 10
+                    :: Widget.Material.Color.textAndBackground palette.error
+                )
+                (Element.text ("Unable to open script in App: " ++ err))
+
+
+scriptParseTopBar : Model -> Element Msg
+scriptParseTopBar { editingProgress } =
     let
         firstButton =
             { icon = Material.Icons.book |> Widget.Icon.elmMaterialIcons Color
@@ -361,7 +409,7 @@ topBar progress =
             }
     in
     buttonWrapper <|
-        case progress of
+        case editingProgress of
             JustStarting ->
                 [ firstButton, arrow, secondButton, arrow, exportButton ]
 
@@ -436,7 +484,7 @@ loaders plainScript loadedScriptPieces =
                 , Element.Border.widthEach { bottom = 0, left = 0, right = 0, top = 1 }
                 , Element.Border.solid
                 , Element.Border.color (Element.rgb 0.8 0.8 0.8)
-                , Element.paddingXY 10 30
+                , Element.paddingXY 20 30
                 ]
                 [ Element.el [ scaledFont 2, Element.Font.heavy ] (Element.text label)
                 , loader
@@ -529,6 +577,7 @@ scriptPieceView selectedPieceIndex labelIndex index (ScriptPiece kind line) =
                             <|
                                 Element.text (label ++ " (" ++ initial ++ ")")
                         )
+                    |> (\lines -> Element.el [ Element.Font.size 14 ] (Element.text "Mark as: ") :: lines)
                     |> Element.paragraph []
                     |> List.singleton
 
@@ -648,8 +697,8 @@ colorFromScriptPiece kind =
             palette.primary
 
 
-buttonWrapper leftButtons =
-    Widget.buttonBar (Material.buttonBar leftButtons palette) (barConfig [])
+buttonWrapper buttons =
+    Widget.buttonBar (Material.buttonBar [] palette) (barConfig buttons)
 
 
 barConfig actions =
@@ -660,7 +709,7 @@ barConfig actions =
     , primaryActions = actions
     , search = Nothing
     , title =
-        Element.row [ Element.paddingXY 16 8, Element.spacing 4 ]
+        Element.row [ Element.spacing 4 ]
             [ Widget.Icon.elmMaterialIcons Color Material.Icons.question_answer <|
                 { size = 20, color = palette.on.primary }
             , Element.text "Cue Maker"
