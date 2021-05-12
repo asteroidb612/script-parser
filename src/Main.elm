@@ -162,6 +162,7 @@ update msg model =
 
         SetScriptPieces pieces ->
             ( { model | editingProgress = SplittingScript pieces }, Cmd.none )
+                |> checkingParser
 
         LoadedScriptPieces pieces ->
             ( { model | loadedScriptPieces = pieces }, Cmd.none )
