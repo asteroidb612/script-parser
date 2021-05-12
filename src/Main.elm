@@ -169,6 +169,7 @@ update msg model =
 
         ReplaceScriptPiecesWithLoaded ->
             ( { model | editingProgress = SplittingScript model.loadedScriptPieces }, Cmd.none )
+                |> checkingParser
 
         -- UI Changes
         LabelMouseEnter i ->
