@@ -43,8 +43,10 @@ cueCannonUrl script =
             --"http://localhost:8080/?script="
             "https://goofy-mccarthy-23ec73.netlify.app/?script="
     in
-    scriptEncoder script
+    script
+        |> scriptEncoder
         |> Json.Encode.encode 0
+        |> String.filter (\c -> Char.toCode c < 128)
         |> Base64.encode
         |> (++) baseUrl
 
