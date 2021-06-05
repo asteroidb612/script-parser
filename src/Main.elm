@@ -99,7 +99,7 @@ type alias Model =
     , loadedScriptPieces : List ScriptPiece
 
     -- View data
-    , selectedPiece : Maybe Int
+    , selectedPiece : Int
     , labelMouseOver : Maybe Int
     , parseError : Maybe String
     }
@@ -109,7 +109,7 @@ init : ( Model, Cmd Msg )
 init =
     ( { editingProgress = JustStarting
       , loadedScriptPieces = []
-      , selectedPiece = Nothing
+      , selectedPiece = 0
       , labelMouseOver = Nothing
       , parseError = Nothing
       }
@@ -182,14 +182,14 @@ update msg model =
             case model.editingProgress of
                 SplittingScript scriptPieces ->
                     if List.length scriptPieces > i && i >= 0 then
-                        ( { model | selectedPiece = Just i }, setShortcutFocus )
+                        ( { model | selectedPiece = i }, setShortcutFocus )
 
                     else
                         ( model, setShortcutFocus )
 
                 DoneEditingScript scriptPieces _ ->
                     if List.length scriptPieces > i && i >= 0 then
-                        ( { model | selectedPiece = Just i }, setShortcutFocus )
+                        ( { model | selectedPiece = i }, setShortcutFocus )
 
                     else
                         ( model, setShortcutFocus )
@@ -204,40 +204,78 @@ update msg model =
         ShortcutPressed i ->
             case i of
                 85 ->
+                    -- U
                     ( model, Cmd.none )
                         |> changingSelectedPieceKindTo UnsurePiece
                         |> selectingNextError
                         |> checkingParser
 
                 67 ->
+                    -- C
                     ( model, Cmd.none )
                         |> changingSelectedPieceKindTo CharacterPiece
                         |> selectingNextError
                         |> checkingParser
 
                 76 ->
+                    -- L
                     ( model, Cmd.none )
                         |> changingSelectedPieceKindTo LinePiece
                         |> selectingNextError
                         |> checkingParser
 
                 73 ->
+                    -- I
                     ( model, Cmd.none )
                         |> changingSelectedPieceKindTo IgnorePiece
                         |> selectingNextError
                         |> checkingParser
 
                 83 ->
+                    -- S
                     ( model, Cmd.none )
                         |> changingSelectedPieceKindTo StageDirectionPiece
                         |> selectingNextError
                         |> checkingParser
 
                 84 ->
+                    -- T
                     ( model, Cmd.none )
                         |> changingSelectedPieceKindTo TitlePiece
                         |> selectingNextError
                         |> checkingParser
+
+                74 ->
+                    -- J (like vim)
+                    let
+                        maxSelectedPieceIndex =
+                            case model.editingProgress of
+                                JustStarting ->
+                                    0
+
+                                EditingScript _ scriptPieces ->
+                                    List.length scriptPieces - 1
+
+                                SplittingScript scriptPieces ->
+                                    List.length scriptPieces - 1
+
+                                DoneEditingScript scriptPieces _ ->
+                                    List.length scriptPieces - 1
+                    in
+                    ( { model
+                        | selectedPiece =
+                            min
+                                maxSelectedPieceIndex
+                                (model.selectedPiece + 1)
+                      }
+                    , Cmd.none
+                    )
+
+                75 ->
+                    -- K (like vim)
+                    ( { model | selectedPiece = max 0 (model.selectedPiece - 1) }
+                    , Cmd.none
+                    )
 
                 _ ->
                     ( model, Cmd.none )
@@ -257,7 +295,7 @@ selectingNextError ( m, cmd ) =
                         scriptPieces
             in
             ( { m
-                | selectedPiece = scriptPieceIndex
+                | selectedPiece = scriptPieceIndex |> Maybe.withDefault 0
               }
             , Cmd.batch [ cmd, scrollToScriptPiece scriptPieceIndex ]
             )
@@ -275,12 +313,8 @@ changingSelectedPieceKindTo k ( m, cmd ) =
                     ScriptPiece k line
 
                 newScriptPieces =
-                    case m.selectedPiece of
-                        Just i ->
-                            scriptPieces |> List.Extra.updateAt i changeScriptPieceType
-
-                        Nothing ->
-                            scriptPieces
+                    scriptPieces
+                        |> List.Extra.updateAt m.selectedPiece changeScriptPieceType
             in
             ( { m | editingProgress = SplittingScript newScriptPieces }, Cmd.batch (storeScriptPieces newScriptPieces :: [ cmd ]) )
     in
@@ -337,31 +371,54 @@ checkingParser ( m, cmd ) =
 scriptParseApp : Model -> { title : String, body : List (Element Msg) }
 scriptParseApp model =
     let
-        scriptSplitter pieces =
-            pieces
-                |> List.indexedMap (scriptPieceView model.selectedPiece model.labelMouseOver)
-                |> Element.textColumn
-                    ([ Element.spacing 5, Element.padding 20, Element.centerX ]
-                        ++ keyboardShortcutListenerAttributes
-                    )
+        splitHeader =
+            [ Element.text "Splitting up \"Untitled\" into cues"
+            , Element.el [ Element.paddingXY 10 0, Element.alignRight ]
+                (Widget.Icon.elmMaterialIcons Color Material.Icons.save <|
+                    { size = 20, color = palette.primary }
+                )
+            ]
+
+        loaderHeader =
+            [ Element.text "Loading a script from..." ]
+
+        header =
+            Element.row
+                [ Element.alignLeft
+                , scaledFont 3
+                , fillWidth
+                , Element.paddingXY 50 30
+                ]
+                (case model.editingProgress of
+                    JustStarting ->
+                        loaderHeader
+
+                    EditingScript _ _ ->
+                        loaderHeader
+
+                    _ ->
+                        splitHeader
+                )
     in
     { title = "CueCannon - Script Parser"
     , body =
         [ Element.column [ fillWidth ] <|
             [ scriptParseTopBar model
             , toast model
+            , header
+            , horizontal
             , case model.editingProgress of
                 JustStarting ->
-                    loaders "" model.loadedScriptPieces
+                    scriptLoaders "" model.loadedScriptPieces
 
                 EditingScript plainScript _ ->
-                    loaders plainScript model.loadedScriptPieces
+                    scriptLoaders plainScript model.loadedScriptPieces
 
                 SplittingScript scriptPieces ->
-                    scriptSplitter scriptPieces
+                    scriptSplitter model.labelMouseOver model.selectedPiece scriptPieces
 
                 DoneEditingScript scriptPieces _ ->
-                    scriptSplitter scriptPieces
+                    scriptSplitter model.labelMouseOver model.selectedPiece scriptPieces
             ]
         ]
     }
@@ -379,7 +436,7 @@ toast model =
                     :: Element.padding 10
                     :: Widget.Material.Color.textAndBackground palette.error
                 )
-                (Element.text ("Unable to open script in App: " ++ err))
+                (Element.text ("Unable to open script in app: " ++ err))
 
 
 scriptParseTopBar : Model -> Element Msg
@@ -451,8 +508,8 @@ scriptParseTopBar { editingProgress } =
                 ]
 
 
-loaders : String -> List ScriptPiece -> Element Msg
-loaders plainScript loadedScriptPieces =
+scriptLoaders : String -> List ScriptPiece -> Element Msg
+scriptLoaders plainScript loadedScriptPieces =
     let
         exampleLoader =
             Element.row [ Element.paddingXY 20 0 ]
@@ -483,20 +540,21 @@ loaders plainScript loadedScriptPieces =
         loaderView label loader =
             Element.row
                 [ fillWidth
-                , Element.Border.widthEach { bottom = 0, left = 0, right = 0, top = 1 }
-                , Element.Border.solid
-                , Element.Border.color (Element.rgb 0.8 0.8 0.8)
-                , Element.paddingXY 20 30
+                , Element.paddingXY 70 30
                 ]
                 [ Element.el [ scaledFont 2, Element.Font.heavy ] (Element.text label)
                 , loader
                 ]
     in
     Element.column
-        [ fillWidth, Element.alignTop, Element.padding 50, Element.spacing 20 ]
-        [ Element.el [ scaledFont 3 ] (Element.text "Load a script from...")
-        , loaderView "Copy/Paste" (copyPasteLoader plainScript)
+        [ fillWidth
+        , Element.alignTop
+        , Element.spacing 20
+        ]
+        [ loaderView "Copy/Paste" (copyPasteLoader plainScript)
+        , horizontal
         , loaderView "Examples" exampleLoader
+        , horizontal
         , loaderView "Saved" localStorageLoader
         ]
 
@@ -520,11 +578,24 @@ copyPasteLoader plainScript =
             }
 
 
-scriptPieceView : Maybe Int -> Maybe Int -> Int -> ScriptPiece -> Element Msg
+scriptSplitter : Maybe Int -> Int -> List ScriptPiece -> Element Msg
+scriptSplitter labelMouseOver selectedPiece pieces =
+    pieces
+        |> List.indexedMap (scriptPieceView selectedPiece labelMouseOver)
+        |> Element.textColumn
+            ([ Element.spacing 5
+             , Element.padding 20
+             , Element.centerX
+             ]
+                ++ keyboardShortcutListenerAttributes
+            )
+
+
+scriptPieceView : Int -> Maybe Int -> Int -> ScriptPiece -> Element Msg
 scriptPieceView selectedPieceIndex labelIndex index (ScriptPiece kind line) =
     let
         isSelected =
-            selectedPieceIndex == Just index
+            selectedPieceIndex == index
 
         isHovered =
             labelIndex == Just index
@@ -542,7 +613,9 @@ scriptPieceView selectedPieceIndex labelIndex index (ScriptPiece kind line) =
                    )
 
         labelHelper =
-            Element.text (labelFromScriptPiece kind)
+            Element.el
+                [ Element.paddingXY 10 0 ]
+                (Element.text (labelFromScriptPiece kind))
 
         mouseOverHelper =
             Element.Events.onMouseEnter (LabelMouseEnter index)
@@ -554,7 +627,7 @@ scriptPieceView selectedPieceIndex labelIndex index (ScriptPiece kind line) =
                         []
                    )
 
-        iconHelper =
+        icon =
             Element.el mouseOverHelper <|
                 Widget.Icon.elmMaterialIcons Color (iconFromScriptPiece kind) <|
                     { size = 20, color = colorFromScriptPiece kind }
@@ -588,14 +661,14 @@ scriptPieceView selectedPieceIndex labelIndex index (ScriptPiece kind line) =
 
         viewHelper scriptLine =
             Element.row style
-                [ Element.textColumn []
+                [ icon
+                , Element.textColumn []
                     (Element.paragraph
                         [ Element.Events.onClick (SelectPiece index)
                         ]
                         [ Element.text scriptLine ]
                         :: scriptPieceKindSelector
                     )
-                , iconHelper
                 ]
     in
     viewHelper line
@@ -776,3 +849,23 @@ scaledFont s =
 
 fillWidth =
     Element.width Element.fill
+
+
+horizontal =
+    Element.row [ fillWidth, Element.padding 10 ]
+        [ Element.el [ Element.width (Element.fillPortion 1) ] Element.none
+        , Element.el
+            [ Element.Border.widthEach
+                { bottom = 0
+                , left = 0
+                , right = 0
+                , top = 2
+                }
+            , Element.Border.solid
+            , Element.Border.color (Element.rgb 0.8 0.8 0.8)
+            , Element.width (Element.fillPortion 8)
+            , Element.centerX
+            ]
+            Element.none
+        , Element.el [ Element.width (Element.fillPortion 1) ] Element.none
+        ]

@@ -96,7 +96,9 @@ makeScriptPieces : String -> List ScriptPiece -> List ScriptPiece
 makeScriptPieces plain oldPieces =
     let
         plainLines =
-            String.split "\n" plain
+            plain
+                |> String.trim
+                |> String.split "\n"
 
         pieceFromLine line =
             if line == "" then
