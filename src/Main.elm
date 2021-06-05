@@ -406,7 +406,6 @@ scriptParseApp model =
             [ scriptParseTopBar model
             , toast model
             , header
-            , horizontal
             , case model.editingProgress of
                 JustStarting ->
                     scriptLoaders "" model.loadedScriptPieces
@@ -537,36 +536,36 @@ scriptLoaders plainScript loadedScriptPieces =
                             , text = "Previously saved script"
                             }
 
-        loaderView label loader =
-            Element.row
-                [ fillWidth
-                , Element.paddingXY 70 30
-                ]
-                [ Element.el [ scaledFont 2, Element.Font.heavy ] (Element.text label)
-                , loader
+        loaderView label =
+            Element.row [ fillWidth, Element.paddingXY 70 30 ]
+                [ Element.el [ scaledFont 2, Element.Font.heavy ]
+                    (Element.text label)
                 ]
     in
-    Element.column
-        [ fillWidth
-        , Element.alignTop
-        , Element.spacing 20
-        ]
-        [ loaderView "Copy/Paste" (copyPasteLoader plainScript)
-        , horizontal
-        , loaderView "Examples" exampleLoader
-        , horizontal
-        , loaderView "Saved" localStorageLoader
+    Element.row [ fillWidth ]
+        [ Element.column []
+            [ loaderView "Copy/Paste"
+            , loaderView "Examples"
+            , loaderView "Saved"
+            ]
+        , Element.column
+            [ Element.width (Element.fillPortion 3)
+            , Element.spacing 40
+            ]
+            [ copyPasteLoader plainScript
+            , exampleLoader
+            , localStorageLoader
+            ]
         ]
 
 
 copyPasteLoader : String -> Element Msg
 copyPasteLoader plainScript =
     Element.el
-        [ fillWidth
-        , scaledFont 1
-        , Element.alignRight
+        [ scaledFont 1
         , Element.alignTop
         , Element.paddingXY 20 0
+        , Element.width (Element.maximum 500 Element.fill)
         ]
     <|
         Element.Input.multiline []
@@ -849,23 +848,3 @@ scaledFont s =
 
 fillWidth =
     Element.width Element.fill
-
-
-horizontal =
-    Element.row [ fillWidth, Element.padding 10 ]
-        [ Element.el [ Element.width (Element.fillPortion 1) ] Element.none
-        , Element.el
-            [ Element.Border.widthEach
-                { bottom = 0
-                , left = 0
-                , right = 0
-                , top = 2
-                }
-            , Element.Border.solid
-            , Element.Border.color (Element.rgb 0.8 0.8 0.8)
-            , Element.width (Element.fillPortion 8)
-            , Element.centerX
-            ]
-            Element.none
-        , Element.el [ Element.width (Element.fillPortion 1) ] Element.none
-        ]
