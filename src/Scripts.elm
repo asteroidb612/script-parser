@@ -46,6 +46,7 @@ cueCannonUrl script =
     script
         |> scriptEncoder
         |> Json.Encode.encode 0
+        -- FIXME process non-ascii characters
         |> String.filter (\c -> Char.toCode c < 128)
         |> Base64.encode
         |> (++) baseUrl
@@ -54,7 +55,9 @@ cueCannonUrl script =
 scriptEncoder : Script -> Json.Encode.Value
 scriptEncoder { title, lines } =
     Json.Encode.object
-        [ ( "lines", Json.Encode.list (lineEncoder title) lines ) ]
+        [ ( "title", Json.Encode.string title )
+        , ( "lines", Json.Encode.list (lineEncoder title) lines )
+        ]
 
 
 lineEncoder : String -> ScriptLine -> Json.Encode.Value
@@ -125,9 +128,13 @@ makeScriptPieces plain oldPieces =
 
 type ParseState
     = StartingParse
-    | Parsed String (List ScriptLine)
+    | Parsed ParsedState
     | AddingLine String (List ScriptLine) { characterName : String, lineSoFar : String }
     | FailedParse String
+
+
+type alias ParsedState =
+    { title : String, lines : List ScriptLine }
 
 
 startingTitle : String
@@ -152,15 +159,19 @@ parseScriptHelper (ScriptPiece kind piece) state =
             state
 
         ( TitlePiece, StartingParse ) ->
-            Parsed piece []
+            Parsed { title = piece, lines = [] }
 
-        ( TitlePiece, Parsed oldTitle _ ) ->
-            FailedParse
-                ("Encountered two titles: "
-                    ++ piece
-                    ++ " and "
-                    ++ oldTitle
-                )
+        ( TitlePiece, Parsed oldPiece ) ->
+            if oldPiece.title == piece then
+                Parsed oldPiece
+
+            else
+                FailedParse
+                    ("Encountered two titles: "
+                        ++ piece
+                        ++ " and "
+                        ++ oldPiece.title
+                    )
 
         ( TitlePiece, AddingLine _ _ _ ) ->
             FailedParse "Encountered"
@@ -168,7 +179,7 @@ parseScriptHelper (ScriptPiece kind piece) state =
         ( CharacterPiece, StartingParse ) ->
             AddingLine startingTitle [] { characterName = piece, lineSoFar = "" }
 
-        ( CharacterPiece, Parsed title lines ) ->
+        ( CharacterPiece, Parsed { title, lines } ) ->
             AddingLine title lines { characterName = piece, lineSoFar = "" }
 
         ( CharacterPiece, AddingLine title lines { characterName, lineSoFar } ) ->
@@ -181,7 +192,10 @@ parseScriptHelper (ScriptPiece kind piece) state =
                     )
 
             else if characterName == piece then
-                Parsed title (lines ++ [ { speaker = characterName, identifier = "", line = lineSoFar } ])
+                Parsed
+                    { title = title
+                    , lines = lines ++ [ { speaker = characterName, identifier = "", line = lineSoFar } ]
+                    }
 
             else
                 AddingLine title
@@ -191,20 +205,29 @@ parseScriptHelper (ScriptPiece kind piece) state =
         ( LinePiece, StartingParse ) ->
             FailedParse ("Encountered Line Piece without preceding Character Piece: " ++ piece)
 
-        ( LinePiece, Parsed _ _ ) ->
+        ( LinePiece, Parsed _ ) ->
             FailedParse ("Encountered Line Piece without preceding Character Piece: " ++ piece)
 
         ( LinePiece, AddingLine title lines { characterName, lineSoFar } ) ->
             AddingLine title lines { characterName = characterName, lineSoFar = lineSoFar ++ piece }
 
 
-parseScript : List ScriptPiece -> Result String Script
-parseScript scriptPieces =
-    case List.foldl parseScriptHelper StartingParse scriptPieces of
+parseScript : Maybe String -> List ScriptPiece -> Result String Script
+parseScript t scriptPieces =
+    let
+        start =
+            case t of
+                Just title ->
+                    Parsed { title = title, lines = [] }
+
+                Nothing ->
+                    StartingParse
+    in
+    case List.foldl parseScriptHelper start scriptPieces of
         FailedParse s ->
             Err s
 
-        Parsed title lines ->
+        Parsed { title, lines } ->
             Ok (Script title lines)
 
         AddingLine title lines { characterName, lineSoFar } ->

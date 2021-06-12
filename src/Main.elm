@@ -84,6 +84,8 @@ type Msg
     | LabelMouseEnter Int
     | LabelMouseLeave
     | ShortcutPressed Int
+    | EditTitle String
+    | DoneEditingTitle
 
 
 type EditingProgress
@@ -91,6 +93,12 @@ type EditingProgress
     | EditingScript String (List ScriptPiece)
     | SplittingScript (List ScriptPiece)
     | DoneEditingScript (List ScriptPiece) Scripts.Script
+
+
+type Title
+    = Untitled
+    | EditingTitle String String
+    | Titled String
 
 
 type alias Model =
@@ -102,6 +110,7 @@ type alias Model =
     , selectedPiece : Int
     , labelMouseOver : Maybe Int
     , parseError : Maybe String
+    , title : Title
     }
 
 
@@ -112,6 +121,7 @@ init =
       , selectedPiece = 0
       , labelMouseOver = Nothing
       , parseError = Nothing
+      , title = Untitled
       }
     , setShortcutFocus
     )
@@ -168,7 +178,11 @@ update msg model =
             ( { model | loadedScriptPieces = pieces }, Cmd.none )
 
         ReplaceScriptPiecesWithLoaded ->
-            ( { model | editingProgress = SplittingScript model.loadedScriptPieces }, Cmd.none )
+            ( { model
+                | editingProgress = SplittingScript model.loadedScriptPieces
+              }
+            , Cmd.none
+            )
                 |> checkingParser
 
         -- UI Changes
@@ -200,6 +214,22 @@ update msg model =
         NextError ->
             ( model, Cmd.none )
                 |> selectingNextError
+
+        EditTitle newTitle ->
+            let
+                oldTitle =
+                    case model.title of
+                        Titled t ->
+                            t
+
+                        _ ->
+                            "Untitled"
+            in
+            ( { model | title = EditingTitle oldTitle newTitle }, Cmd.none )
+
+        DoneEditingTitle ->
+            ( model, Cmd.none )
+                |> finishingTitleEdit
 
         ShortcutPressed i ->
             case i of
@@ -284,6 +314,27 @@ update msg model =
             ( model, Cmd.none )
 
 
+finishingTitleEdit : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+finishingTitleEdit ( m, cmd ) =
+    let
+        newTitle =
+            case m.title of
+                Titled t ->
+                    Titled t
+
+                EditingTitle old new ->
+                    if String.trim new == "" then
+                        Titled old
+
+                    else
+                        Titled new
+
+                Untitled ->
+                    Untitled
+    in
+    ( { m | title = newTitle }, cmd )
+
+
 selectingNextError : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
 selectingNextError ( m, cmd ) =
     case m.editingProgress of
@@ -316,14 +367,18 @@ changingSelectedPieceKindTo k ( m, cmd ) =
                     scriptPieces
                         |> List.Extra.updateAt m.selectedPiece changeScriptPieceType
             in
-            ( { m | editingProgress = SplittingScript newScriptPieces }, Cmd.batch (storeScriptPieces newScriptPieces :: [ cmd ]) )
+            ( { m | editingProgress = SplittingScript newScriptPieces }
+            , Cmd.batch (storeScriptPieces newScriptPieces :: [ cmd ])
+            )
     in
     case m.editingProgress of
         SplittingScript scriptPieces ->
             changePiece scriptPieces
+                |> settingTitleFromSelected
 
         DoneEditingScript scriptPieces _ ->
             changePiece scriptPieces
+                |> settingTitleFromSelected
 
         _ ->
             ( m, cmd )
@@ -336,8 +391,16 @@ checkingParser ( m, cmd ) =
             let
                 anyUnsurePieces =
                     List.any (\(ScriptPiece kind _) -> kind == UnsurePiece) scriptPieces
+
+                title =
+                    case m.title of
+                        Titled t ->
+                            Just t
+
+                        _ ->
+                            Nothing
             in
-            case parseScript scriptPieces of
+            case parseScript title scriptPieces of
                 Ok exportLink ->
                     ( { m
                         | editingProgress = DoneEditingScript scriptPieces exportLink
@@ -352,6 +415,39 @@ checkingParser ( m, cmd ) =
 
                     else
                         ( { m | parseError = Just e }, Cmd.batch [ cmd, scrollToTop ] )
+
+        _ ->
+            ( m, cmd )
+
+
+settingTitleFromSelected : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+settingTitleFromSelected ( m, cmd ) =
+    let
+        updateTitleFromScriptPiece scriptPieces =
+            let
+                extractTitle piece =
+                    case piece of
+                        Just (ScriptPiece TitlePiece line) ->
+                            Titled line
+
+                        _ ->
+                            m.title
+
+                title =
+                    scriptPieces
+                        |> List.Extra.getAt m.selectedPiece
+                        |> extractTitle
+            in
+            ( { m | title = title }
+            , cmd
+            )
+    in
+    case m.editingProgress of
+        SplittingScript scriptPieces ->
+            updateTitleFromScriptPiece scriptPieces
+
+        DoneEditingScript scriptPieces _ ->
+            updateTitleFromScriptPiece scriptPieces
 
         _ ->
             ( m, cmd )
@@ -372,12 +468,42 @@ scriptParseApp : Model -> { title : String, body : List (Element Msg) }
 scriptParseApp model =
     let
         splitHeader =
-            [ Element.text "Splitting up \"Untitled\" into cues"
-            , Element.el [ Element.paddingXY 10 0, Element.alignRight ]
-                (Widget.Icon.elmMaterialIcons Color Material.Icons.save <|
-                    { size = 20, color = palette.primary }
-                )
-            ]
+            case model.title of
+                Titled t ->
+                    [ Element.el
+                        [ Element.Events.onClick (EditTitle t) ]
+                        (Element.text ("Splitting up \"" ++ t ++ "\" into cues"))
+                    ]
+
+                EditingTitle old new ->
+                    [ Element.row [ Element.spacing 4 ]
+                        [ Element.text "Title: "
+                        , Element.Input.text [ Element.width (Element.px 400) ]
+                            { onChange = EditTitle
+                            , text = new
+                            , placeholder =
+                                Just
+                                    (Element.Input.placeholder
+                                        []
+                                        (Element.text new)
+                                    )
+                            , label = Element.Input.labelHidden "Title"
+                            }
+                        , Element.el [ Element.Events.onClick DoneEditingTitle ]
+                            (Widget.Icon.elmMaterialIcons Color Material.Icons.save <|
+                                { size = 20, color = palette.primary }
+                            )
+                        , Element.el
+                            [ Element.Events.onClick DoneEditingTitle, scaledFont 1 ]
+                            (Element.text "Save")
+                        ]
+                    ]
+
+                Untitled ->
+                    [ Element.el
+                        [ Element.Events.onClick (EditTitle "") ]
+                        (Element.text "Splitting up \"Untitled\" into cues")
+                    ]
 
         loaderHeader =
             [ Element.text "Loading a script from..." ]
