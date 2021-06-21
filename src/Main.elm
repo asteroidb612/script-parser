@@ -322,23 +322,24 @@ update msg model =
         SelectAwsFile file ->
             ( model, Task.perform LoadAwsFile (File.toString file) )
 
-        LoadAwsFile transcription ->
-            let
-                progress =
-                    case D.decodeString transcriptionDecoder transcription of
-                        Ok t ->
-                            t
+        LoadAwsFile t ->
+            case D.decodeString transcriptionDecoder t of
+                Ok transcription ->
+                    ( { model
+                        | editingProgress =
+                            transcription
                                 |> renderTranscription
                                 |> makeScriptPieces []
                                 |> SplittingScript
+                      }
+                    , Cmd.none
+                    )
+                        |> checkingParser
 
-                        Err r ->
-                            Debug.todo (Debug.toString r)
-            in
-            ( { model | editingProgress = progress }
-            , Cmd.none
-            )
-                |> checkingParser
+                Err e ->
+                    ( { model | parseError = Just <| D.errorToString e }
+                    , Cmd.none
+                    )
 
         NoOp ->
             ( model, Cmd.none )
@@ -444,7 +445,9 @@ checkingParser ( m, cmd ) =
                         ( m, cmd )
 
                     else
-                        ( { m | parseError = Just e }, Cmd.batch [ cmd, scrollToTop ] )
+                        ( { m | parseError = Just ("Unable to open script in app: " ++ e) }
+                        , Cmd.batch [ cmd, scrollToTop ]
+                        )
 
         _ ->
             ( m, cmd )
@@ -591,7 +594,7 @@ toast model =
                     :: Element.padding 10
                     :: Widget.Material.Color.textAndBackground palette.error
                 )
-                (Element.text ("Unable to open script in app: " ++ err))
+                (Element.text err)
 
 
 scriptParseTopBar : Model -> Element Msg
