@@ -199,22 +199,15 @@ update msg model =
             ( { model | labelMouseOver = Nothing }, Cmd.none )
 
         SelectPiece i ->
-            case model.editingProgress of
-                SplittingScript scriptPieces ->
+            case progressIfEditing model of
+                Just scriptPieces ->
                     if List.length scriptPieces > i && i >= 0 then
                         ( { model | selectedPiece = i }, setShortcutFocus )
 
                     else
                         ( model, setShortcutFocus )
 
-                DoneEditingScript scriptPieces _ ->
-                    if List.length scriptPieces > i && i >= 0 then
-                        ( { model | selectedPiece = i }, setShortcutFocus )
-
-                    else
-                        ( model, setShortcutFocus )
-
-                _ ->
+                Nothing ->
                     ( model, setShortcutFocus )
 
         NextError ->
@@ -234,8 +227,13 @@ update msg model =
             ( { model | title = EditingTitle oldTitle newTitle }, Cmd.none )
 
         DoneEditingTitle ->
-            ( model, Cmd.none )
-                |> finishingTitleEdit
+            case progressIfEditing model of
+                Just scriptPieces ->
+                    ( model, storeScriptPieces scriptPieces )
+                        |> finishingTitleEdit
+
+                Nothing ->
+                    ( model, Cmd.none )
 
         ShortcutPressed i ->
             case i of
@@ -368,8 +366,8 @@ finishingTitleEdit ( m, cmd ) =
 
 selectingNextError : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
 selectingNextError ( m, cmd ) =
-    case m.editingProgress of
-        SplittingScript scriptPieces ->
+    case progressIfEditing m of
+        Just scriptPieces ->
             let
                 scriptPieceIndex =
                     List.Extra.findIndex
@@ -382,7 +380,7 @@ selectingNextError ( m, cmd ) =
             , Cmd.batch [ cmd, scrollToScriptPiece scriptPieceIndex ]
             )
 
-        _ ->
+        Nothing ->
             ( m, cmd )
 
 
@@ -402,12 +400,8 @@ changingSelectedPieceKindTo k ( m, cmd ) =
             , Cmd.batch (storeScriptPieces newScriptPieces :: [ cmd ])
             )
     in
-    case m.editingProgress of
-        SplittingScript scriptPieces ->
-            changePiece scriptPieces
-                |> settingTitleFromSelected
-
-        DoneEditingScript scriptPieces _ ->
+    case progressIfEditing m of
+        Just scriptPieces ->
             changePiece scriptPieces
                 |> settingTitleFromSelected
 
@@ -417,8 +411,8 @@ changingSelectedPieceKindTo k ( m, cmd ) =
 
 checkingParser : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
 checkingParser ( m, cmd ) =
-    case m.editingProgress of
-        SplittingScript scriptPieces ->
+    case progressIfEditing m of
+        Just scriptPieces ->
             let
                 anyUnsurePieces =
                     List.any (\(ScriptPiece kind _) -> kind == UnsurePiece) scriptPieces
@@ -449,7 +443,7 @@ checkingParser ( m, cmd ) =
                         , Cmd.batch [ cmd, scrollToTop ]
                         )
 
-        _ ->
+        Nothing ->
             ( m, cmd )
 
 
@@ -475,15 +469,25 @@ settingTitleFromSelected ( m, cmd ) =
             , cmd
             )
     in
-    case m.editingProgress of
-        SplittingScript scriptPieces ->
+    case progressIfEditing m of
+        Just scriptPieces ->
             updateTitleFromScriptPiece scriptPieces
 
-        DoneEditingScript scriptPieces _ ->
-            updateTitleFromScriptPiece scriptPieces
+        Nothing ->
+            ( m, cmd )
+
+
+progressIfEditing : Model -> Maybe (List ScriptPiece)
+progressIfEditing model =
+    case model.editingProgress of
+        SplittingScript s ->
+            Just s
+
+        DoneEditingScript s _ ->
+            Just s
 
         _ ->
-            ( m, cmd )
+            Nothing
 
 
 
@@ -633,16 +637,26 @@ scriptParseTopBar { editingProgress } =
             EditingScript plainScript oldScriptPieces ->
                 let
                     splitScript =
-                        Just <| SetScriptPieces <| makeScriptPieces oldScriptPieces plainScript
+                        makeScriptPieces oldScriptPieces plainScript
+                            |> SetScriptPieces
+                            |> Just
                 in
-                [ firstButton, arrow, { secondButton | onPress = splitScript }, arrow, exportButton ]
+                [ firstButton
+                , arrow
+                , { secondButton | onPress = splitScript }
+                , arrow
+                , exportButton
+                ]
 
             SplittingScript scriptPieces ->
                 let
                     plainScript =
                         extractPlainScript scriptPieces
                 in
-                [ { firstButton | text = "Edit script", onPress = Just (ChangeScript scriptPieces plainScript) }
+                [ { firstButton
+                    | text = "Edit script"
+                    , onPress = Just (ChangeScript scriptPieces plainScript)
+                  }
                 , arrow
                 , { secondButton | onPress = Just NoOp }
                 , arrow
@@ -654,7 +668,10 @@ scriptParseTopBar { editingProgress } =
                     plainScript =
                         extractPlainScript scriptPieces
                 in
-                [ { firstButton | text = "Edit script", onPress = Just (ChangeScript scriptPieces plainScript) }
+                [ { firstButton
+                    | text = "Edit script"
+                    , onPress = Just (ChangeScript scriptPieces plainScript)
+                  }
                 , arrow
                 , { secondButton | onPress = Just NoOp }
                 , arrow
@@ -687,7 +704,8 @@ scriptLoaders plainScript loadedScriptPieces =
             Element.el [ Element.paddingXY 20 0 ] <|
                 case loadedScriptPieces of
                     [] ->
-                        Widget.textButton (Material.textButton palette) { onPress = Nothing, text = "No saved script found" }
+                        Widget.textButton (Material.textButton palette)
+                            { onPress = Nothing, text = "No saved script found" }
 
                     _ ->
                         Widget.textButton (Material.textButton palette)
