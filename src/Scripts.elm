@@ -95,8 +95,8 @@ type
     | TitlePiece
 
 
-makeScriptPieces : String -> List ScriptPiece -> List ScriptPiece
-makeScriptPieces plain oldPieces =
+makeScriptPieces : List ScriptPiece -> String -> List ScriptPiece
+makeScriptPieces oldPieces plain =
     let
         plainLines =
             plain

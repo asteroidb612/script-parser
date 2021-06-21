@@ -12,6 +12,8 @@ import Element.Input
 import Element.Lazy
 import ElmPages exposing (canonicalSiteUrl, generateFiles, manifest, markdownDocument, view)
 import Examples exposing (book, scene1)
+import File exposing (File)
+import File.Select as Select
 import Html.Attributes
 import Html.Events
 import Json.Decode as D
@@ -32,6 +34,7 @@ import Scripts
         )
 import Storage exposing (decodeScriptPieces, loadScriptPieces, storeScriptPieces)
 import Task
+import Transcription exposing (Transcription, renderTranscription, transcriptionDecoder)
 import Widget
 import Widget.Icon exposing (Icon)
 import Widget.Material as Material exposing (defaultPalette)
@@ -86,6 +89,9 @@ type Msg
     | ShortcutPressed Int
     | EditTitle String
     | DoneEditingTitle
+    | RequestAwsFile
+    | SelectAwsFile File
+    | LoadAwsFile String
 
 
 type EditingProgress
@@ -309,6 +315,30 @@ update msg model =
 
                 _ ->
                     ( model, Cmd.none )
+
+        RequestAwsFile ->
+            ( model, Select.file [ "text/json" ] SelectAwsFile )
+
+        SelectAwsFile file ->
+            ( model, Task.perform LoadAwsFile (File.toString file) )
+
+        LoadAwsFile transcription ->
+            let
+                progress =
+                    case D.decodeString transcriptionDecoder transcription of
+                        Ok t ->
+                            t
+                                |> renderTranscription
+                                |> makeScriptPieces []
+                                |> SplittingScript
+
+                        Err r ->
+                            Debug.todo (Debug.toString r)
+            in
+            ( { model | editingProgress = progress }
+            , Cmd.none
+            )
+                |> checkingParser
 
         NoOp ->
             ( model, Cmd.none )
@@ -600,7 +630,7 @@ scriptParseTopBar { editingProgress } =
             EditingScript plainScript oldScriptPieces ->
                 let
                     splitScript =
-                        Just <| SetScriptPieces <| makeScriptPieces plainScript oldScriptPieces
+                        Just <| SetScriptPieces <| makeScriptPieces oldScriptPieces plainScript
                 in
                 [ firstButton, arrow, { secondButton | onPress = splitScript }, arrow, exportButton ]
 
@@ -640,12 +670,12 @@ scriptLoaders plainScript loadedScriptPieces =
             Element.row [ Element.paddingXY 20 0 ]
                 [ Widget.textButton (Material.textButton palette)
                     { onPress =
-                        Just (SetScriptPieces (makeScriptPieces scene1 []))
+                        Just (SetScriptPieces (makeScriptPieces [] scene1))
                     , text = "Macbeth"
                     }
                 , Widget.textButton (Material.textButton palette)
                     { onPress =
-                        Just (SetScriptPieces (makeScriptPieces book []))
+                        Just (SetScriptPieces (makeScriptPieces [] book))
                     , text = "Hamilton"
                     }
                 ]
@@ -673,6 +703,7 @@ scriptLoaders plainScript loadedScriptPieces =
             [ loaderView "Copy/Paste"
             , loaderView "Examples"
             , loaderView "Saved"
+            , loaderView "AWS"
             ]
         , Element.column
             [ Element.width (Element.fillPortion 3)
@@ -681,6 +712,7 @@ scriptLoaders plainScript loadedScriptPieces =
             [ copyPasteLoader plainScript
             , exampleLoader
             , localStorageLoader
+            , awsLoader
             ]
         ]
 
@@ -700,6 +732,15 @@ copyPasteLoader plainScript =
             , placeholder = Just (Element.Input.placeholder [] (Element.text "Paste here!"))
             , label = Element.Input.labelHidden "Copy/Paste"
             , spellcheck = False
+            }
+
+
+awsLoader : Element Msg
+awsLoader =
+    Element.el [ Element.paddingXY 20 0 ] <|
+        Widget.textButton (Material.textButton palette)
+            { onPress = Just RequestAwsFile
+            , text = "Upload Transcript"
             }
 
 
