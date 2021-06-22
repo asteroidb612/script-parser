@@ -241,36 +241,42 @@ update msg model =
                     -- U
                     ( model, Cmd.none )
                         |> changingSelectedPieceKindTo UnsurePiece
+                        |> selectingNextError
                         |> checkingParser
 
                 67 ->
                     -- C
                     ( model, Cmd.none )
                         |> changingSelectedPieceKindTo CharacterPiece
+                        |> selectingNextError
                         |> checkingParser
 
                 76 ->
                     -- L
                     ( model, Cmd.none )
                         |> changingSelectedPieceKindTo LinePiece
+                        |> selectingNextError
                         |> checkingParser
 
                 73 ->
                     -- I
                     ( model, Cmd.none )
                         |> changingSelectedPieceKindTo IgnorePiece
+                        |> selectingNextError
                         |> checkingParser
 
                 83 ->
                     -- S
                     ( model, Cmd.none )
                         |> changingSelectedPieceKindTo StageDirectionPiece
+                        |> selectingNextError
                         |> checkingParser
 
                 84 ->
                     -- T
                     ( model, Cmd.none )
                         |> changingSelectedPieceKindTo TitlePiece
+                        |> selectingNextError
                         |> checkingParser
 
                 74 ->
