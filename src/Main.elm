@@ -377,7 +377,9 @@ selectingNextError ( m, cmd ) =
             ( { m
                 | selectedPiece = scriptPieceIndex |> Maybe.withDefault 0
               }
-            , Cmd.batch [ cmd, scrollToScriptPiece scriptPieceIndex ]
+            , cmd
+              -- FIXME Removing until bugfix. Wrapped script lines make scrolling go offscreen
+              -- , Cmd.batch [ cmd, scrollToScriptPiece scriptPieceIndex ]
             )
 
         Nothing ->
