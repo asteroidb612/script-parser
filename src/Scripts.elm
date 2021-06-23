@@ -66,7 +66,6 @@ lineEncoder title { speaker, identifier, line } =
         [ ( "t", Json.Encode.string line )
         , ( "s", Json.Encode.string speaker )
         , ( "l", Json.Encode.string identifier )
-        , ( "p", Json.Encode.string title )
         ]
 
 
