@@ -191,12 +191,6 @@ parseScriptHelper (ScriptPiece kind piece) state =
                         ++ characterName
                     )
 
-            else if characterName == piece then
-                Parsed
-                    { title = title
-                    , lines = lines ++ [ { speaker = characterName, identifier = "", line = lineSoFar } ]
-                    }
-
             else
                 AddingLine title
                     (lines ++ [ { speaker = characterName, identifier = "", line = lineSoFar } ])
