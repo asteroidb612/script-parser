@@ -202,7 +202,7 @@ parseScriptHelper (ScriptPiece kind piece) state =
             FailedParse ("Encountered Line Piece without preceding Character Piece: " ++ piece)
 
         ( LinePiece, AddingLine title lines { characterName, lineSoFar } ) ->
-            AddingLine title lines { characterName = characterName, lineSoFar = lineSoFar ++ piece }
+            AddingLine title lines { characterName = characterName, lineSoFar = lineSoFar ++ " " ++ piece }
 
 
 parseScript : Maybe String -> List ScriptPiece -> Result String Script
