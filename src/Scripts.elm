@@ -215,8 +215,11 @@ parseScript t scriptPieces =
 
                 Nothing ->
                     StartingParse
+
+        trimPieces (ScriptPiece kind piece) =
+            ScriptPiece kind (String.trim piece)
     in
-    case List.foldl parseScriptHelper start scriptPieces of
+    case List.foldl parseScriptHelper start (List.map trimPieces scriptPieces) of
         FailedParse s ->
             Err s
 
