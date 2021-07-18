@@ -2,10 +2,11 @@ import "./style.css";
 // @ts-ignore
 const { Elm } = require("./src/Main.elm");
 const pagesInit = require("elm-pages");
+require("./src/imageLoader.js");
 
 pagesInit({
-  mainElmModule: Elm.Main
-}).then(function(app) {
+  mainElmModule: Elm.Main,
+}).then(function (app) {
   //  ____            _
   // |  _ \ ___  _ __| |_ ___
   // | |_) / _ \| '__| __/ __|
@@ -14,7 +15,7 @@ pagesInit({
   //
 
   // Save script pieces on change
-  app.ports.storeScriptPiecesValue.subscribe(function(scriptPieces) {
+  app.ports.storeScriptPiecesValue.subscribe(function (scriptPieces) {
     localStorage.setItem(
       "cuecannon-script-pieces",
       JSON.stringify(scriptPieces)

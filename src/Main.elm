@@ -14,6 +14,7 @@ import ElmPages exposing (canonicalSiteUrl, generateFiles, manifest, markdownDoc
 import Examples exposing (book, scene1)
 import File exposing (File)
 import File.Select as Select
+import Html
 import Html.Attributes
 import Html.Events
 import Json.Decode as D
@@ -688,20 +689,6 @@ scriptParseTopBar { editingProgress } =
 scriptLoaders : String -> List ScriptPiece -> Element Msg
 scriptLoaders plainScript loadedScriptPieces =
     let
-        exampleLoader =
-            Element.row [ Element.paddingXY 20 0 ]
-                [ Widget.textButton (Material.textButton palette)
-                    { onPress =
-                        Just (SetScriptPieces (makeScriptPieces [] scene1))
-                    , text = "Macbeth"
-                    }
-                , Widget.textButton (Material.textButton palette)
-                    { onPress =
-                        Just (SetScriptPieces (makeScriptPieces [] book))
-                    , text = "Hamilton"
-                    }
-                ]
-
         localStorageLoader =
             Element.el [ Element.paddingXY 20 0 ] <|
                 case loadedScriptPieces of
@@ -724,6 +711,7 @@ scriptLoaders plainScript loadedScriptPieces =
     Element.row [ fillWidth ]
         [ Element.column []
             [ loaderView "Copy/Paste"
+            , loaderView "Image"
             , loaderView "Examples"
             , loaderView "Saved"
             , loaderView "AWS"
@@ -733,10 +721,26 @@ scriptLoaders plainScript loadedScriptPieces =
             , Element.spacing 40
             ]
             [ copyPasteLoader plainScript
+            , imageLoader
             , exampleLoader
             , localStorageLoader
             , awsLoader
             ]
+        ]
+
+
+exampleLoader =
+    Element.row [ Element.paddingXY 20 0 ]
+        [ Widget.textButton (Material.textButton palette)
+            { onPress =
+                Just (SetScriptPieces (makeScriptPieces [] scene1))
+            , text = "Macbeth"
+            }
+        , Widget.textButton (Material.textButton palette)
+            { onPress =
+                Just (SetScriptPieces (makeScriptPieces [] book))
+            , text = "Hamilton"
+            }
         ]
 
 
@@ -765,6 +769,20 @@ awsLoader =
             { onPress = Just RequestAwsFile
             , text = "Upload Transcript"
             }
+
+
+imageLoader =
+    Element.el [ Element.paddingXY 20 0 ] <|
+        Element.html <|
+            Html.div []
+                [ Html.node "custom-file"
+                    [ Html.Events.on "image-loader-finished"
+                        (D.map (\imageScript -> SetScriptPieces (makeScriptPieces [] imageScript))
+                            (D.field "detail" D.string)
+                        )
+                    ]
+                    []
+                ]
 
 
 scriptSplitter : Maybe Int -> Int -> List ScriptPiece -> Element Msg
