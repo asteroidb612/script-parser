@@ -52,20 +52,27 @@ cueCannonUrl script =
         |> (++) baseUrl
 
 
+
+-- scriptEncoder : Script -> Json.Encode.Value
+-- scriptEncoder { title, lines } =
+--     Json.Encode.object
+--         [ ( "title", Json.Encode.string title )
+--         , ( "lines", Json.Encode.list (lineEncoder title) lines )
+--         ]
+
+
 scriptEncoder : Script -> Json.Encode.Value
-scriptEncoder { title, lines } =
-    Json.Encode.object
-        [ ( "title", Json.Encode.string title )
-        , ( "lines", Json.Encode.list (lineEncoder title) lines )
-        ]
+scriptEncoder { lines } =
+    Json.Encode.list (lineEncoder "") lines
 
 
 lineEncoder : String -> ScriptLine -> Json.Encode.Value
 lineEncoder title { speaker, identifier, line } =
     Json.Encode.object
-        [ ( "t", Json.Encode.string line )
+        [ ( "l", Json.Encode.string line )
         , ( "s", Json.Encode.string speaker )
-        , ( "l", Json.Encode.string identifier )
+        , ( "p", Json.Encode.string identifier )
+        , ( "t", Json.Encode.string "" )
         ]
 
 
