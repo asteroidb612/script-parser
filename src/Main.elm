@@ -814,7 +814,7 @@ scriptSplitter labelMouseOver selectedPiece pieces =
 
         scriptSplitGuesser =
             Element.column [ Element.paddingXY 60 10 ]
-                [ Element.text "I'll try to guess actors names from looking at the script. Click on my guesses to split their cues."
+                [ Element.text "I'll try to guess actors names from looking at the script. Click on my guesses to split their cues. Sorry if they're nonsense - I'm a machine!"
                 , scriptSplitGuesses
                 ]
 

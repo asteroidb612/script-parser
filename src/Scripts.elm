@@ -309,7 +309,7 @@ applyGuessedActor name pieces =
                 ScriptPiece UnsurePiece s ->
                     if String.startsWith name s then
                         [ ScriptPiece CharacterPiece cleanName
-                        , ScriptPiece LinePiece (String.dropLeft (String.length name) s)
+                        , ScriptPiece LinePiece (String.dropLeft (String.length cleanName) s)
                         ]
 
                     else
