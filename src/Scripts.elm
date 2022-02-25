@@ -4,6 +4,8 @@ module Scripts exposing
     , ScriptLine
     , ScriptPiece(..)
     , ScriptPieceKind(..)
+    , actorGuesses
+    , applyGuessedActor
     , cueCannonUrl
     , extractPlainScript
     , makeScriptPieces
@@ -12,6 +14,8 @@ module Scripts exposing
     )
 
 import Base64
+import Dict
+import Dict.Extra
 import Json.Encode
 import List.Extra
 
@@ -243,5 +247,76 @@ parseScript t scriptPieces =
 extractPlainScript : List ScriptPiece -> String
 extractPlainScript scriptPieces =
     scriptPieces
-        |> List.map (\(ScriptPiece _ s) -> s)
+        |> extractPlainScriptPieces
         |> String.join "\n"
+
+
+extractPlainScriptPieces : List ScriptPiece -> List String
+extractPlainScriptPieces scriptPieces =
+    scriptPieces
+        |> List.map (\(ScriptPiece _ s) -> s)
+
+
+extractUnsurePlainScriptPieces : List ScriptPiece -> List String
+extractUnsurePlainScriptPieces scriptPieces =
+    let
+        filterUnsurePieces piece =
+            case piece of
+                ScriptPiece UnsurePiece s ->
+                    Just s
+
+                _ ->
+                    Nothing
+    in
+    List.filterMap filterUnsurePieces scriptPieces
+
+
+allPrefixesFromUniquePairs pieces =
+    pieces
+        |> extractUnsurePlainScriptPieces
+        |> List.map String.toList
+        |> List.Extra.uniquePairs
+        |> List.map (\( pairA, pairB ) -> List.Extra.zip pairA pairB)
+        |> List.map (List.Extra.takeWhile (\( a, b ) -> a == b))
+        |> List.map (List.map Tuple.first)
+        |> List.map String.fromList
+
+
+actorGuesses pieces =
+    allPrefixesFromUniquePairs pieces
+        |> Dict.Extra.groupBy (\x -> x)
+        |> Dict.toList
+        |> List.map (\( name, instances ) -> ( name, -(List.length instances) ))
+        |> List.sortBy Tuple.second
+        |> List.map Tuple.first
+        |> List.filter (\x -> String.length x > 1)
+        |> List.take 4
+
+
+applyGuessedActor name pieces =
+    let
+        endPunctuationMarks =
+            [ ' ', ':' ]
+
+        cleanName =
+            name
+                |> String.toList
+                |> List.Extra.dropWhileRight (\c -> List.member c endPunctuationMarks)
+                |> String.fromList
+
+        splitGuessedActor piece =
+            case piece of
+                ScriptPiece UnsurePiece s ->
+                    if String.startsWith name s then
+                        [ ScriptPiece CharacterPiece cleanName
+                        , ScriptPiece LinePiece (String.dropLeft (String.length name) s)
+                        ]
+
+                    else
+                        [ piece ]
+
+                _ ->
+                    [ piece ]
+    in
+    pieces
+        |> List.concatMap splitGuessedActor

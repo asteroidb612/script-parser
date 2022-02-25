@@ -28,6 +28,8 @@ import Scripts
     exposing
         ( ScriptPiece(..)
         , ScriptPieceKind(..)
+        , actorGuesses
+        , applyGuessedActor
         , cueCannonUrl
         , extractPlainScript
         , makeScriptPieces
@@ -82,6 +84,7 @@ type Msg
     | SetScriptPieces (List ScriptPiece)
     | LoadedScriptPieces (List ScriptPiece)
     | ReplaceScriptPiecesWithLoaded
+    | GuessedActor String
       -- View actions
     | SelectPiece Int
     | NextError
@@ -191,6 +194,16 @@ update msg model =
             , Cmd.none
             )
                 |> checkingParser
+
+        GuessedActor name ->
+            case model.editingProgress of
+                SplittingScript pieces ->
+                    ( { model | editingProgress = SplittingScript (applyGuessedActor name pieces) }
+                    , Cmd.none
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
 
         -- UI Changes
         LabelMouseEnter i ->
@@ -789,19 +802,19 @@ scriptSplitter : Maybe Int -> Int -> List ScriptPiece -> Element Msg
 scriptSplitter labelMouseOver selectedPiece pieces =
     let
         scriptSplitGuesses =
-            [ "Arthur", "Podrick" ]
+            actorGuesses pieces
                 |> List.map
                     (\name ->
                         Widget.textButton (Material.chip palette)
                             { text = name
-                            , onPress = Nothing
+                            , onPress = Just (GuessedActor name)
                             }
                     )
                 |> Element.row [ Element.padding 20, Element.spacing 20 ]
 
         scriptSplitGuesser =
             Element.column [ Element.paddingXY 60 10 ]
-                [ Element.text "Click on actors' name to auto split them"
+                [ Element.text "I'll try to guess actors names from looking at the script. Click on my guesses to split their cues."
                 , scriptSplitGuesses
                 ]
 
