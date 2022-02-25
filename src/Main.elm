@@ -787,15 +787,36 @@ imageLoader =
 
 scriptSplitter : Maybe Int -> Int -> List ScriptPiece -> Element Msg
 scriptSplitter labelMouseOver selectedPiece pieces =
-    pieces
-        |> List.indexedMap (scriptPieceView selectedPiece labelMouseOver)
-        |> Element.textColumn
-            ([ Element.spacing 5
-             , Element.padding 20
-             , Element.centerX
-             ]
-                ++ keyboardShortcutListenerAttributes
-            )
+    let
+        scriptSplitGuesses =
+            [ "Arthur", "Podrick" ]
+                |> List.map
+                    (\name ->
+                        Widget.textButton (Material.chip palette)
+                            { text = name
+                            , onPress = Nothing
+                            }
+                    )
+                |> Element.row [ Element.padding 20, Element.spacing 20 ]
+
+        scriptSplitGuesser =
+            Element.column [ Element.paddingXY 60 10 ]
+                [ Element.text "Click on actors' name to auto split them"
+                , scriptSplitGuesses
+                ]
+
+        scriptPieceEditor =
+            pieces
+                |> List.indexedMap (scriptPieceView selectedPiece labelMouseOver)
+                |> Element.textColumn
+                    ([ Element.spacing 5
+                     , Element.padding 20
+                     , Element.centerX
+                     ]
+                        ++ keyboardShortcutListenerAttributes
+                    )
+    in
+    Element.column [] [ scriptSplitGuesser, scriptPieceEditor ]
 
 
 scriptPieceView : Int -> Maybe Int -> Int -> ScriptPiece -> Element Msg
@@ -810,7 +831,6 @@ scriptPieceView selectedPieceIndex labelIndex index (ScriptPiece kind line) =
         style =
             Element.spacing 60
                 :: Element.pointer
-                :: Element.mouseOver [ Element.scale 1.01 ]
                 :: (if isSelected then
                         Widget.Material.Color.textAndBackground
                             (Widget.Material.Color.fromCIELCH { l = 94, c = 50, h = 83 })
@@ -855,9 +875,9 @@ scriptPieceView selectedPieceIndex labelIndex index (ScriptPiece kind line) =
                                 [ Element.padding 3
                                 , Element.Font.size 14
                                 , Element.Events.onClick (ChangeScriptPiece k)
+                                , Element.mouseOver [ Element.scale 1.01 ]
                                 ]
-                            <|
-                                Element.text (label ++ " (" ++ initial ++ ")")
+                                (Element.text (label ++ " (" ++ initial ++ ")"))
                         )
                     |> (\lines -> Element.el [ Element.Font.size 14 ] (Element.text "Mark as: ") :: lines)
                     |> Element.paragraph []
