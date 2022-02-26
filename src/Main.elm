@@ -13,6 +13,7 @@ import Element.Lazy
 import ElmPages exposing (canonicalSiteUrl, generateFiles, manifest, markdownDocument, view)
 import Examples exposing (book, scene1)
 import File exposing (File)
+import File.Download
 import File.Select as Select
 import Html
 import Html.Attributes
@@ -30,6 +31,7 @@ import Scripts
         , ScriptPieceKind(..)
         , actorGuesses
         , applyGuessedActor
+        , cueCannonScript
         , cueCannonUrl
         , extractPlainScript
         , makeScriptPieces
@@ -79,7 +81,8 @@ type Msg
     = NoOp
       -- Script actions
     | ChangeScript (List ScriptPiece) String
-    | Export String
+    | ClickedExport String
+    | ClickedDownload Scripts.Script
     | ChangeScriptPiece ScriptPieceKind
     | SetScriptPieces (List ScriptPiece)
     | LoadedScriptPieces (List ScriptPiece)
@@ -163,8 +166,11 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         -- Editing script and script pieces
-        Export href ->
+        ClickedExport href ->
             ( model, Nav.load href )
+
+        ClickedDownload script ->
+            ( model, File.Download.string (script.title ++ ".json") "text/json" (cueCannonScript script) )
 
         ChangeScript ll s ->
             case model.editingProgress of
@@ -635,7 +641,9 @@ scriptParseTopBar { editingProgress } =
         exportButton =
             { icon =
                 Material.Icons.cancel |> Widget.Icon.elmMaterialIcons Color
-            , text = "Open script in app"
+
+            --, text = "Open script in app"
+            , text = "Download script"
             , onPress = Nothing
             }
 
@@ -679,7 +687,7 @@ scriptParseTopBar { editingProgress } =
                 , exportButton
                 ]
 
-            DoneEditingScript scriptPieces exportLink ->
+            DoneEditingScript scriptPieces script ->
                 let
                     plainScript =
                         extractPlainScript scriptPieces
@@ -691,10 +699,16 @@ scriptParseTopBar { editingProgress } =
                 , arrow
                 , { secondButton | onPress = Just NoOp }
                 , arrow
+
+                --, { icon =
+                --        Material.Icons.upgrade |> Widget.Icon.elmMaterialIcons Color
+                --  , text = "Open script in app"
+                --  , onPress = Just (ClickedExport (cueCannonUrl script))
+                --  }
                 , { icon =
                         Material.Icons.upgrade |> Widget.Icon.elmMaterialIcons Color
-                  , text = "Open script in app"
-                  , onPress = Just (Export (cueCannonUrl exportLink))
+                  , text = "Download Script"
+                  , onPress = Just (ClickedDownload script)
                   }
                 ]
 

@@ -6,6 +6,7 @@ module Scripts exposing
     , ScriptPieceKind(..)
     , actorGuesses
     , applyGuessedActor
+    , cueCannonScript
     , cueCannonUrl
     , extractPlainScript
     , makeScriptPieces
@@ -47,13 +48,18 @@ cueCannonUrl script =
             --"http://localhost:8080/?script="
             "https://goofy-mccarthy-23ec73.netlify.app/?script="
     in
-    script
-        |> scriptEncoder
-        |> Json.Encode.encode 0
+    cueCannonScript script
         -- FIXME process non-ascii characters
         |> String.filter (\c -> Char.toCode c < 128)
         |> Base64.encode
         |> (++) baseUrl
+
+
+cueCannonScript : Script -> String
+cueCannonScript script =
+    script
+        |> scriptEncoder
+        |> Json.Encode.encode 0
 
 
 
@@ -309,7 +315,7 @@ applyGuessedActor name pieces =
                 ScriptPiece UnsurePiece s ->
                     if String.startsWith name s then
                         [ ScriptPiece CharacterPiece cleanName
-                        , ScriptPiece LinePiece (String.dropLeft (String.length cleanName) s)
+                        , ScriptPiece LinePiece (String.dropLeft (String.length name) s)
                         ]
 
                     else
